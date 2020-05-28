@@ -1,3 +1,5 @@
+[![docs.rs](https://docs.rs/async-mpd/badge.svg)](https://docs.rs/async-mpd)
+
 # Async-mpd
 
 Async-std based Mpd client library
