@@ -38,12 +38,12 @@ use async_std::{
 use itertools::Itertools;
 use log::{info, trace, warn};
 use serde::de::{self, Unexpected};
-use serde::{Deserialize, Deserializer};
-use std::fmt::{self, Debug};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt::Debug;
 use std::io;
 use time::Duration;
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 /// Mpd status response
 pub struct Status {
     /// Name of current partition
@@ -89,7 +89,7 @@ pub struct Status {
     pub error: Option<String>,
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 /// Track in Queue
 pub struct QueuedTrack {
     pub file: String,
@@ -105,7 +105,7 @@ pub struct QueuedTrack {
     pub id: u32,
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 /// Mpd database statistics
 pub struct Stats {
     #[serde(deserialize_with = "de_time_int")]
@@ -120,7 +120,7 @@ pub struct Stats {
     pub db_update: i32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 /// Subsystem
 pub enum Subsystem {
