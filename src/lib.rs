@@ -40,6 +40,7 @@ use log::{info, trace, warn};
 use serde::Serialize;
 use std::fmt::Debug;
 use std::io;
+use time::Duration;
 
 #[derive(Serialize, Debug, Default)]
 /// Mpd status response
@@ -47,7 +48,7 @@ pub struct Status {
     /// Name of current partition
     pub partition: String,
     /// Volume (0 - 100)
-    pub volume: i32,
+    pub volume: u8,
     /// Repeat
     pub repeat: bool,
     /// Random
@@ -58,24 +59,27 @@ pub struct Status {
     pub consume: bool,
     /// Playlist version number
     pub playlist: u32,
-    pub playlistlength: i32,
-    pub song: i32,
-    pub songid: i32,
-    pub nextsong: i32,
-    pub nextsongid: i32,
-    pub time: i32,
-    pub elapsed: i32,
-    pub duration: i32,
+    pub playlistlength: u32,
+    pub song: u32,
+    pub songid: u32,
+    pub nextsong: u32,
+    pub nextsongid: u32,
+    // TODO: mpd returns this as "291:336" for 291.336 seconds.
+    // It’s almost usually just a few ms ahead of elapsed,
+    // so I’m not sure if we need this at all.
+    pub time: String,
+    pub elapsed: Duration,
+    pub duration: Duration,
     pub mixrampdb: f32,
     /// mixrampdelay in seconds
-    pub mixrampdelay: i32,
+    pub mixrampdelay: u32,
     pub state: String,
     /// Instantaneous bitrate in kbps
-    pub bitrate: i32,
+    pub bitrate: u16,
     /// crossfade in seconds
-    pub xfade: i32,
+    pub xfade: u32,
     pub audio: String,
-    pub updating_db: i32,
+    pub updating_db: u32,
     pub error: String,
 }
 
@@ -88,22 +92,22 @@ pub struct QueuedTrack {
     pub album_artist_sort: String,
     pub performer: Vec<String>,
     pub title: String,
-    pub track: i32,
+    pub track: u32,
     pub album: String,
     pub artist: String,
-    pub pos: i32,
-    pub id: i32,
+    pub pos: u32,
+    pub id: u32,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
 /// Mpd database statistics
 pub struct Stats {
-    pub uptime: i32,
-    pub playtime: i32,
-    pub artists: i32,
-    pub albums: i32,
-    pub songs: i32,
-    pub db_playtime: i32,
+    pub uptime: Duration,
+    pub playtime: Duration,
+    pub artists: u32,
+    pub albums: u32,
+    pub songs: u32,
+    pub db_playtime: Duration,
     pub db_update: i32,
 }
 
@@ -164,15 +168,17 @@ impl MpdClient {
         let mut stats = Stats::default();
 
         for l in lines {
-            if let Some((k, v)) = l.split(": ").next_tuple() {
+            if let Some((k, v)) = l.splitn(2, ": ").next_tuple() {
                 match k {
-                    "uptime" => stats.uptime = v.parse().unwrap_or_default(),
+                    "uptime" => stats.uptime = Duration::seconds(v.parse().unwrap_or_default()),
                     "albums" => stats.albums = v.parse().unwrap_or_default(),
                     "artists" => stats.artists = v.parse().unwrap_or_default(),
                     "songs" => stats.songs = v.parse().unwrap_or_default(),
-                    "db_playtime" => stats.db_playtime = v.parse().unwrap_or_default(),
+                    "db_playtime" => {
+                        stats.db_playtime = Duration::seconds(v.parse().unwrap_or_default())
+                    }
                     "db_update" => stats.db_update = v.parse().unwrap_or_default(),
-                    "playtime" => stats.playtime = v.parse().unwrap_or_default(),
+                    "playtime" => stats.playtime = Duration::seconds(v.parse().unwrap_or_default()),
                     _ => warn!("unknown field: {}: {}", k, v),
                 }
             }
@@ -202,8 +208,12 @@ impl MpdClient {
                     "songid" => status.songid = v.parse().unwrap_or_default(),
                     "nextsong" => status.nextsong = v.parse().unwrap_or_default(),
                     "nextsongid" => status.nextsongid = v.parse().unwrap_or_default(),
-                    "elapsed" => status.elapsed = v.parse().unwrap_or_default(),
-                    "duration" => status.duration = v.parse().unwrap_or_default(),
+                    "elapsed" => {
+                        status.elapsed = Duration::seconds_f32(v.parse().unwrap_or_default())
+                    }
+                    "duration" => {
+                        status.duration = Duration::seconds_f32(v.parse().unwrap_or_default())
+                    }
                     "time" => status.time = v.parse().unwrap_or_default(),
                     "mixrampdb" => status.mixrampdb = v.parse().unwrap_or_default(),
                     "audio" => status.audio = v.to_string(),
