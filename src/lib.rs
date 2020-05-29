@@ -121,6 +121,7 @@ pub struct Stats {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
 /// Subsystem
 pub enum Subsystem {
     Database,
@@ -128,6 +129,7 @@ pub enum Subsystem {
     Mixer,
     Options,
     Update,
+    #[serde(rename = "stored_playlist")]
     StoredPlaylist,
     Playlist,
     Output,
@@ -261,24 +263,7 @@ impl MpdClient {
                 return Ok(None);
             }
 
-            return Ok(match v {
-                "database" => Some(Subsystem::Database),
-                "player" => Some(Subsystem::Player),
-                "mixer" => Some(Subsystem::Mixer),
-                "options" => Some(Subsystem::Options),
-                "update" => Some(Subsystem::Update),
-                "stored_playlist" => Some(Subsystem::StoredPlaylist),
-                "playlist" => Some(Subsystem::Playlist),
-                "output" => Some(Subsystem::Output),
-                "partitions" => Some(Subsystem::Partitions),
-                "sticker" => Some(Subsystem::Sticker),
-                "subscription" => Some(Subsystem::Subscription),
-                "message" => Some(Subsystem::Message),
-                _ => {
-                    log::debug!("unknown subsystem {}", v);
-                    None
-                }
-            });
+            return Ok(serde_yaml::from_str(v).ok());
         }
         Ok(None)
     }
