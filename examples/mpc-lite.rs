@@ -1,4 +1,4 @@
-use async_mpd::MpdClient;
+use async_mpd::{MpdClient, Tag, Filter, ToFilterExpr};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -41,6 +41,10 @@ enum Command {
     Stats,
     Update,
     Rescan,
+    Search {
+        artist: Option<String>,
+        album: Option<String>,
+    },
 }
 
 #[async_std::main]
@@ -91,7 +95,7 @@ async fn main() -> std::io::Result<()> {
         Command::Queue => {
             let queue = client.queue().await?;
             for song in queue {
-                println!("{}:\t{} - {}", song.pos, song.artist, song.title);
+                println!("{:?}:\t{} - {}", song.pos, song.artist, song.title);
             }
         }
         Command::Idle => loop {
@@ -105,6 +109,22 @@ async fn main() -> std::io::Result<()> {
         Command::Rescan => {
             let dbv = client.rescan(None).await?;
             println!("Rescan id: {}", dbv);
+        }
+        Command::Search { artist, album } => {
+            use Tag::*;
+
+            let mut filter = Filter::new();
+
+            if let Some(artist) = artist {
+                filter = filter.and(Artist.contains(&artist));
+            }
+
+            if let Some(album) = album {
+                filter = filter.and(Album.contains(&album));
+            }
+
+            let res = client.search(&filter).await?;
+            println!("{:?}", res);
         }
     }
 
