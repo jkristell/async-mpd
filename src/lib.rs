@@ -43,6 +43,12 @@ use std::fmt::Debug;
 use std::io;
 use time::Duration;
 
+mod track;
+use track::Track;
+
+mod search;
+pub use search::{FilterExpr, Tag, ToFilterExpr, Filter};
+
 #[derive(Deserialize, Serialize, Debug, Default)]
 /// Mpd status response
 pub struct Status {
@@ -89,21 +95,6 @@ pub struct Status {
     pub error: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-/// Track in Queue
-pub struct QueuedTrack {
-    pub file: String,
-    pub artist_sort: String,
-    pub album_artist: String,
-    pub album_artist_sort: String,
-    pub performer: Vec<String>,
-    pub title: String,
-    pub track: u32,
-    pub album: String,
-    pub artist: String,
-    pub pos: u32,
-    pub id: u32,
-}
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 /// Mpd database statistics
@@ -379,41 +370,38 @@ impl MpdClient {
         self.read_resp_ok().await
     }
 
-    pub async fn queue(&mut self) -> io::Result<Vec<QueuedTrack>> {
+    pub async fn queue(&mut self) -> io::Result<Vec<Track>> {
         self.send_cmd("playlistinfo").await?;
         let resp = self.read_resp().await?;
-
-        let mut qi = QueuedTrack::default();
-        let mut vec = Vec::new();
-
-        // TODO: replace this with serde deserialization
-        for line in resp.lines() {
-            if let Some((k, v)) = line.split(": ").next_tuple() {
-                match k {
-                    "file" => {
-                        if !qi.file.is_empty() {
-                            vec.push(qi.clone());
-                            qi = QueuedTrack::default();
-                        }
-                        qi.file = v.to_string();
-                    }
-                    "Title" => qi.title = v.to_string(),
-                    "Track" => qi.track = v.parse().unwrap_or_default(),
-                    "Album" => qi.album = v.to_string(),
-                    "Artist" => qi.artist = v.to_string(),
-                    "Pos" => qi.pos = v.parse().unwrap_or_default(),
-                    "Id" => qi.id = v.parse().unwrap_or_default(),
-                    "Performer" => qi.performer.push(v.to_string()),
-                    _ => warn!("Unhandled qi field: {}: {}", k, v),
-                }
-            }
-        }
-
-        if !qi.file.is_empty() {
-            vec.push(qi);
-        }
-
+        let vec = track::from_lines(&resp);
         Ok(vec)
+    }
+
+    /// # Example
+    /// ```
+    /// use async_mpd::{MpdClient, Tag, Filter, ToFilterExpr};
+    ///
+    /// #[async_std::main]
+    /// async fn main() -> std::io::Result<()> {
+    ///     // Connect to server
+    ///     let mut mpd = MpdClient::new("localhost:6600").await?;
+    ///
+    ///     let mut filter = Filter::new()
+    ///         .and(Tag::Artist.equals("The Beatles"))
+    ///         .and_not(Tag::Album.contains("Rubber"));
+    ///
+    ///     let res = mpd.search(&filter).await?;
+    ///     println!("{:?}", res);
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn search(&mut self, filter: &Filter) -> io::Result<Vec<Track>> {
+        self.send_cmd_with_arg("search", filter.to_query())
+            .await?;
+        let resp = self.read_resp().await?;
+        let tracks = track::from_lines(&resp);
+        Ok(tracks)
     }
 
     async fn send_cmd(&mut self, cmd: &str) -> io::Result<()> {
