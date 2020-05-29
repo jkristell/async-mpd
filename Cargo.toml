@@ -14,6 +14,9 @@ readme = "README.md"
 async-std = { version = "1.6.0", features = ["attributes"] }
 itertools = "0.9.0"
 serde = { version = "1.0", features = ["derive"] }
+# The MPD responses are (almost) a tiny subset of yaml.
+# It might make sense to write a custom parser at some point instead.
+serde_yaml = "0.8"
 log = "0.4.8"
 time = { version = "0.2", features = ["serde"] }
 

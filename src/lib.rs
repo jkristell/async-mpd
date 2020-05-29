@@ -37,53 +37,59 @@ use async_std::{
 };
 use itertools::Itertools;
 use log::{info, trace, warn};
-use serde::Serialize;
-use std::fmt::Debug;
+use serde::de::{self, Unexpected};
+use serde::{Deserialize, Deserializer};
+use std::fmt::{self, Debug};
 use std::io;
 use time::Duration;
 
-#[derive(Serialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default)]
 /// Mpd status response
 pub struct Status {
     /// Name of current partition
-    pub partition: String,
+    pub partition: Option<String>,
     /// Volume (0 - 100)
     pub volume: u8,
-    /// Repeat
+    #[serde(deserialize_with = "de_bint")]
     pub repeat: bool,
-    /// Random
+    #[serde(deserialize_with = "de_bint")]
     pub random: bool,
     /// 0, 1 or Oneshot
     pub single: String,
-    /// Consume
+    #[serde(deserialize_with = "de_bint")]
     pub consume: bool,
     /// Playlist version number
     pub playlist: u32,
     pub playlistlength: u32,
-    pub song: u32,
-    pub songid: u32,
-    pub nextsong: u32,
-    pub nextsongid: u32,
+    pub song: Option<u32>,
+    pub songid: Option<u32>,
+    pub nextsong: Option<u32>,
+    pub nextsongid: Option<u32>,
     // TODO: mpd returns this as "291:336" for 291.336 seconds.
     // It’s almost usually just a few ms ahead of elapsed,
     // so I’m not sure if we need this at all.
-    pub time: String,
-    pub elapsed: Duration,
-    pub duration: Duration,
+    pub time: Option<String>,
+    #[serde(deserialize_with = "de_time_float")]
+    #[serde(default)]
+    pub elapsed: Option<Duration>,
+    #[serde(deserialize_with = "de_time_float")]
+    #[serde(default)]
+    pub duration: Option<Duration>,
     pub mixrampdb: f32,
     /// mixrampdelay in seconds
-    pub mixrampdelay: u32,
+    pub mixrampdelay: Option<u32>,
+    /// TODO: make this an enum
     pub state: String,
     /// Instantaneous bitrate in kbps
-    pub bitrate: u16,
+    pub bitrate: Option<u16>,
     /// crossfade in seconds
-    pub xfade: u32,
-    pub audio: String,
-    pub updating_db: u32,
-    pub error: String,
+    pub xfade: Option<u32>,
+    pub audio: Option<String>,
+    pub updating_db: Option<u32>,
+    pub error: Option<String>,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Clone, Debug, Default)]
 /// Track in Queue
 pub struct QueuedTrack {
     pub file: String,
@@ -99,19 +105,22 @@ pub struct QueuedTrack {
     pub id: u32,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Clone, Debug, Default)]
 /// Mpd database statistics
 pub struct Stats {
+    #[serde(deserialize_with = "de_time_int")]
     pub uptime: Duration,
+    #[serde(deserialize_with = "de_time_int")]
     pub playtime: Duration,
     pub artists: u32,
     pub albums: u32,
     pub songs: u32,
+    #[serde(deserialize_with = "de_time_int")]
     pub db_playtime: Duration,
     pub db_update: i32,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Deserialize, Debug)]
 /// Subsystem
 pub enum Subsystem {
     Database,
@@ -126,6 +135,42 @@ pub enum Subsystem {
     Sticker,
     Subscription,
     Message,
+}
+
+/// Deserialize time from an integer that represents the seconds.
+/// mpd uses int for the database stats (e.g. total time played).
+fn de_time_int<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    i64::deserialize(deserializer).map(Duration::seconds)
+}
+
+/// Deserialize time from a float that represents the seconds.
+/// mpd uses floats for the current status (e.g. time elapsed in song).
+fn de_time_float<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    f64::deserialize(deserializer)
+        .map(Duration::seconds_f64)
+        .map(Some)
+}
+
+/// mpd uses bints (0 or 1) to represent booleans,
+/// so we need a special parser for those.
+fn de_bint<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(false),
+        1 => Ok(true),
+        n => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(n as u64),
+            &"zero or one",
+        )),
+    }
 }
 
 /// Mpd Client
@@ -164,67 +209,16 @@ impl MpdClient {
     /// Get stats on the music database
     pub async fn stats(&mut self) -> io::Result<Stats> {
         self.send_cmd("stats").await?;
-        let lines = self.read_resp_lines().await?;
-        let mut stats = Stats::default();
-
-        for l in lines {
-            if let Some((k, v)) = l.splitn(2, ": ").next_tuple() {
-                match k {
-                    "uptime" => stats.uptime = Duration::seconds(v.parse().unwrap_or_default()),
-                    "albums" => stats.albums = v.parse().unwrap_or_default(),
-                    "artists" => stats.artists = v.parse().unwrap_or_default(),
-                    "songs" => stats.songs = v.parse().unwrap_or_default(),
-                    "db_playtime" => {
-                        stats.db_playtime = Duration::seconds(v.parse().unwrap_or_default())
-                    }
-                    "db_update" => stats.db_update = v.parse().unwrap_or_default(),
-                    "playtime" => stats.playtime = Duration::seconds(v.parse().unwrap_or_default()),
-                    _ => warn!("unknown field: {}: {}", k, v),
-                }
-            }
-        }
-
-        Ok(stats)
+        let lines = self.read_resp().await?;
+        Ok(serde_yaml::from_str(&lines)
+            .unwrap_or_else(|e| panic!("Failed to parse mpd response: “{}” with {}", &lines, e)))
     }
 
     pub async fn status(&mut self) -> io::Result<Status> {
         self.send_cmd("status").await?;
-        let lines = self.read_resp_lines().await?;
-        let mut status = Status::default();
-
-        for l in lines {
-            if let Some((k, v)) = l.split(": ").next_tuple() {
-                match k {
-                    "partition" => status.partition = v.to_string(),
-                    "single" => status.single = v.to_string(),
-                    "state" => status.state = v.to_string(),
-                    "volume" => status.volume = v.parse().unwrap_or_default(),
-                    "repeat" => status.repeat = v.parse::<i32>().unwrap_or_default() != 0,
-                    "random" => status.random = v.parse::<i32>().unwrap_or_default() != 0,
-                    "consume" => status.consume = v.parse::<i32>().unwrap_or_default() != 0,
-                    "playlistlength" => status.playlistlength = v.parse().unwrap_or_default(),
-                    "playlist" => status.playlist = v.parse().unwrap_or_default(),
-                    "song" => status.song = v.parse().unwrap_or_default(),
-                    "songid" => status.songid = v.parse().unwrap_or_default(),
-                    "nextsong" => status.nextsong = v.parse().unwrap_or_default(),
-                    "nextsongid" => status.nextsongid = v.parse().unwrap_or_default(),
-                    "elapsed" => {
-                        status.elapsed = Duration::seconds_f32(v.parse().unwrap_or_default())
-                    }
-                    "duration" => {
-                        status.duration = Duration::seconds_f32(v.parse().unwrap_or_default())
-                    }
-                    "time" => status.time = v.parse().unwrap_or_default(),
-                    "mixrampdb" => status.mixrampdb = v.parse().unwrap_or_default(),
-                    "audio" => status.audio = v.to_string(),
-                    "bitrate" => status.bitrate = v.parse().unwrap_or_default(),
-                    "updating_db" => status.updating_db = v.parse().unwrap_or_default(),
-                    _ => warn!("Unknown status field: {}: {}", k, v),
-                }
-            }
-        }
-
-        Ok(status)
+        let lines = self.read_resp().await?;
+        Ok(serde_yaml::from_str(&lines)
+            .unwrap_or_else(|e| panic!("Failed to parse mpd response: “{}” with {}", &lines, e)))
     }
 
     pub async fn update(&mut self, path: Option<&str>) -> io::Result<i32> {
@@ -253,15 +247,15 @@ impl MpdClient {
 
     pub async fn idle(&mut self) -> io::Result<Option<Subsystem>> {
         self.send_cmd("idle").await?;
-        let mut lines = self.read_resp_lines().await?;
+        let resp = self.read_resp().await?;
+        let mut lines = resp.lines();
 
-        if lines.len() != 1 {
-            log::warn!("More than one line");
+        let line = lines.next().unwrap_or_default();
+        for unexpected_line in lines {
+            log::warn!("More than one line in idle response: {}", unexpected_line);
         }
 
-        let line = lines.pop().unwrap_or_default();
-
-        if let Some((k, v)) = line.split(": ").next_tuple() {
+        if let Some((k, v)) = line.splitn(2, ": ").next_tuple() {
             if k != "changed" {
                 log::warn!("k not changed");
                 return Ok(None);
@@ -286,7 +280,6 @@ impl MpdClient {
                 }
             });
         }
-
         Ok(None)
     }
 
@@ -365,9 +358,9 @@ impl MpdClient {
         self.send_cmd_with_arg("listall", path).await?;
 
         Ok(self
-            .read_resp_lines()
+            .read_resp()
             .await?
-            .iter()
+            .lines()
             .filter_map(|line| {
                 if line.starts_with("file: ") {
                     Some(line[6..].to_string())
@@ -380,10 +373,10 @@ impl MpdClient {
 
     pub async fn listalldirs(&mut self) -> io::Result<Vec<String>> {
         self.send_cmd("listall").await?;
-        let lines = self.read_resp_lines().await?;
+        let lines = self.read_resp().await?;
 
         Ok(lines
-            .into_iter()
+            .lines()
             .filter(|s| s.starts_with("directory: "))
             .map(|s| s[11..].to_string())
             .collect())
@@ -403,12 +396,13 @@ impl MpdClient {
 
     pub async fn queue(&mut self) -> io::Result<Vec<QueuedTrack>> {
         self.send_cmd("playlistinfo").await?;
-        let lines = self.read_resp_lines().await?;
+        let resp = self.read_resp().await?;
 
         let mut qi = QueuedTrack::default();
         let mut vec = Vec::new();
 
-        for line in lines {
+        // TODO: replace this with serde deserialization
+        for line in resp.lines() {
             if let Some((k, v)) = line.split(": ").next_tuple() {
                 match k {
                     "file" => {
@@ -483,7 +477,7 @@ impl MpdClient {
     }
 
     /// Read all response lines
-    async fn read_resp_lines(&mut self) -> io::Result<Vec<String>> {
+    async fn read_resp(&mut self) -> io::Result<String> {
         let mut v = Vec::new();
 
         loop {
@@ -507,7 +501,7 @@ impl MpdClient {
             v.push(line.to_string())
         }
 
-        Ok(v)
+        Ok(v.join("\n"))
     }
 
     /// Expect one line response
