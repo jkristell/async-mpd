@@ -45,6 +45,7 @@ enum Command {
         artist: Option<String>,
         album: Option<String>,
     },
+    Lsinfo { path: Option<String> },
 }
 
 #[async_std::main]
@@ -95,7 +96,7 @@ async fn main() -> std::io::Result<()> {
         Command::Queue => {
             let queue = client.queue().await?;
             for song in queue {
-                println!("{:?}:\t{} - {}", song.pos, song.artist, song.title);
+                println!("{:?}:\t{:?} - {:?}", song.pos, song.artist, song.title);
             }
         }
         Command::Idle => loop {
@@ -125,6 +126,15 @@ async fn main() -> std::io::Result<()> {
 
             let res = client.search(&filter).await?;
             println!("{:?}", res);
+        }
+        Command::Lsinfo {path} => {
+
+            let res = client.lsinfo(path.as_deref()).await?;
+
+            for t in res {
+                println!("{:?}", t);
+            }
+
         }
     }
 

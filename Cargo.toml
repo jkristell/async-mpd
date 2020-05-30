@@ -18,6 +18,7 @@ serde = { version = "1.0", features = ["derive"] }
 # It might make sense to write a custom parser at some point instead.
 serde_yaml = "0.8"
 log = "0.4.8"
+chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 structopt = "0.3"

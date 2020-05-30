@@ -358,6 +358,16 @@ impl MpdClient {
             .collect())
     }
 
+    pub async fn lsinfo(&mut self, path: Option<&str>) -> io::Result<Vec<Track>> {
+        self.send_cmd_with_arg("listallinfo", path).await?;
+
+        let resp = self.read_resp().await?;
+
+        let r = track::from_response(&resp);
+        Ok(r)
+    }
+
+
     // Queue
 
     pub async fn queue_add(&mut self, path: &str) -> io::Result<()> {
@@ -373,7 +383,7 @@ impl MpdClient {
     pub async fn queue(&mut self) -> io::Result<Vec<Track>> {
         self.send_cmd("playlistinfo").await?;
         let resp = self.read_resp().await?;
-        let vec = track::from_lines(&resp);
+        let vec = track::from_response(&resp);
         Ok(vec)
     }
 
@@ -400,7 +410,7 @@ impl MpdClient {
         self.send_cmd_with_arg("search", filter.to_query())
             .await?;
         let resp = self.read_resp().await?;
-        let tracks = track::from_lines(&resp);
+        let tracks = track::from_response(&resp);
         Ok(tracks)
     }
 
