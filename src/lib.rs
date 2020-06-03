@@ -49,7 +49,7 @@ pub struct Status {
     /// Name of current partition
     pub partition: Option<String>,
     /// Volume (0 - 100)
-    pub volume: u8,
+    pub volume: Option<u8>,
     #[serde(deserialize_with = "de_bint")]
     pub repeat: bool,
     #[serde(deserialize_with = "de_bint")]
