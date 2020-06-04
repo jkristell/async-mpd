@@ -41,7 +41,7 @@ use serde::de::{self, Unexpected};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::Debug;
 use std::io;
-use time::Duration;
+use std::time::Duration;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 /// Mpd status response
@@ -145,7 +145,7 @@ fn de_time_int<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where
     D: Deserializer<'de>,
 {
-    i64::deserialize(deserializer).map(Duration::seconds)
+    u64::deserialize(deserializer).map(Duration::from_secs)
 }
 
 /// Deserialize time from a float that represents the seconds.
@@ -155,7 +155,7 @@ where
     D: Deserializer<'de>,
 {
     f64::deserialize(deserializer)
-        .map(Duration::seconds_f64)
+        .map(Duration::from_secs_f64)
         .map(Some)
 }
 
