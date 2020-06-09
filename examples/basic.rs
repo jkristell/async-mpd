@@ -1,12 +1,4 @@
-[![crates.io version](https://meritbadge.herokuapp.com/async-mpd)](https://crates.io/crates/async-mpd)
-[![docs.rs](https://docs.rs/async-mpd/badge.svg)](https://docs.rs/async-mpd)
 
-# Async-mpd
-
-Async-std based Mpd client library
-
-## Example:
-```rust
 #[async_std::main]
 async fn main() -> std::io::Result<()> {
     // Connect to server
@@ -36,4 +28,3 @@ async fn main() -> std::io::Result<()> {
 
     Ok(())
 }
-```

@@ -1,39 +1,11 @@
+use crate::Tag;
 use itertools::Itertools;
 
-#[derive(Copy, Clone, Debug)]
-/// Track tags
-pub enum Tag {
-    Artist,
-    ArtistSort,
-    Album,
-    AlbumSort,
-    AlbumArtist,
-    AlbumSortOrder,
-    Title,
-    Track,
-    Name,
-    Genre,
-    Date,
-    Composer,
-    Performer,
-    Conductor,
-    Work,
-    Grouping,
-    Comment,
-    Disc,
-    Label,
-    MusicbrainzArtistId,
-    MusicbrainzAlbumId,
-    MusicbrainzAlbumArtistId,
-    MusicbrainzTrackId,
-    MusicbrainzReleaseTrackId,
-    MusicbrainzWorkId,
-    Any,
-}
-
 pub trait ToFilterExpr {
+    /// Tag equals
     fn equals<T: ToString>(self, s: T) -> FilterExpr;
 
+    /// Tag contains
     fn contains<T: ToString>(self, s: T) -> FilterExpr;
 }
 
@@ -52,7 +24,6 @@ pub enum FilterExpr {
     Equals(Tag, String),
     Contains(Tag, String),
     Not(Box<FilterExpr>),
-
 }
 
 impl FilterExpr {
@@ -65,52 +36,51 @@ impl FilterExpr {
     }
 }
 
+/// Abstraction over search filter
 pub struct Filter {
-    filters: Vec<FilterExpr>,
+    exprs: Vec<FilterExpr>,
 }
 
 impl Filter {
-
     pub fn new() -> Self {
         Self {
-            filters: Vec::new()
+            exprs: Vec::new(),
         }
     }
 
     pub fn with(filter: FilterExpr) -> Self {
         Self {
-            filters: vec![filter]
+            exprs: vec![filter],
         }
     }
 
     pub fn and(mut self, other: FilterExpr) -> Filter {
-        self.filters.push(other);
+        self.exprs.push(other);
         self
     }
 
     pub fn and_not(mut self, other: FilterExpr) -> Self {
-        self.filters.push(FilterExpr::Not(Box::new(other)));
+        self.exprs.push(FilterExpr::Not(Box::new(other)));
         self
     }
 
     pub fn to_query(&self) -> Option<String> {
-
-        if self.filters.is_empty() {
+        if self.exprs.is_empty() {
             return None;
         }
 
-        let joined = self.filters.iter()
+        let joined = self
+            .exprs
+            .iter()
             .map(|filter| filter.to_query())
             .join(" AND ");
 
         Some(format!("({})", escape(&joined)))
     }
-
 }
 
 fn escape(s: &str) -> String {
-    s
-        .replace('\\', "\\\\")
+    s.replace('\\', "\\\\")
         .replace('\"', "\\\"")
         .replace('\'', "\\\'")
 }

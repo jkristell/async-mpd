@@ -1,4 +1,4 @@
-use async_mpd::{MpdClient, Tag, Filter, ToFilterExpr};
+use async_mpd::{Filter, MpdClient, Tag, ToFilterExpr};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -23,7 +23,7 @@ enum Command {
     },
     Play,
     Playid {
-        id: i32,
+        id: u32,
     },
     Pause,
     /// Next
@@ -31,7 +31,7 @@ enum Command {
     /// Clear the queue
     Clear,
     Setvol {
-        vol: i32,
+        vol: u32,
     },
     Listall {
         path: Option<String>,
@@ -45,7 +45,9 @@ enum Command {
         artist: Option<String>,
         album: Option<String>,
     },
-    Lsinfo { path: Option<String> },
+    Lsinfo {
+        path: Option<String>,
+    },
 }
 
 #[async_std::main]
@@ -125,16 +127,15 @@ async fn main() -> std::io::Result<()> {
             }
 
             let res = client.search(&filter).await?;
+
             println!("{:?}", res);
         }
-        Command::Lsinfo {path} => {
-
-            let res = client.lsinfo(path.as_deref()).await?;
+        Command::Lsinfo { path } => {
+            let res = client.listallinfo(path.as_deref()).await?;
 
             for t in res {
-                println!("{:?}", t);
+                println!("{:#?}", t);
             }
-
         }
     }
 
