@@ -4,14 +4,17 @@ async fn main() -> std::io::Result<()> {
     // Connect to server
     let mut mpd = async_mpd::MpdClient::new("localhost:6600").await?;
 
-    // Get all tracks in the play queue and display them
+    // Get all tracks in the play queue
     let queue = mpd.queue().await?;
+
+    // Print the queue
     for track in queue {
         println!(
             "{:3}: {} - {}",
             track.id.unwrap(),
-            track.artist.unwrap_or("Unknown artist".into()),
-            track.title.unwrap_or("Unknown title".into()));
+            track.artist.unwrap_or_default(),
+            track.title.unwrap_or_default(),
+        );
     }
 
     // Play track nr 2 in the queue
