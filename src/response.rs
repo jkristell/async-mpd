@@ -15,14 +15,14 @@ pub enum Mixed {
 
 impl Mixed {
     /// Try to convert to Track
-    pub fn track(self) -> Option<Track> {
+    pub fn track(&self) -> Option<&Track> {
         match self {
             Mixed::File(t) => Some(t),
             _ => None,
         }
     }
     /// Try to convert to Directory
-    pub fn directory(self) -> Option<Directory> {
+    pub fn directory(&self) -> Option<&Directory> {
         match self {
             Mixed::Directory(d) => Some(d),
             _ => None,
@@ -31,7 +31,7 @@ impl Mixed {
 }
 
 pub(crate) fn tracks(resp: &str) -> Vec<Track> {
-    mixed(resp).into_iter().filter_map(Mixed::track).collect()
+    mixed(resp).iter().filter_map(Mixed::track).cloned().collect()
 }
 
 pub(crate) fn mixed(resp: &str) -> Vec<Mixed> {
