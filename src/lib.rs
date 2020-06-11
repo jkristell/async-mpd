@@ -219,8 +219,8 @@ pub enum Subsystem {
 /// Deserialize time from an integer that represents the seconds.
 /// mpd uses int for the database stats (e.g. total time played).
 fn de_time_int<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     u64::deserialize(deserializer).map(Duration::from_secs)
 }
@@ -229,8 +229,8 @@ fn de_time_int<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 /// Deserialize time from a float that represents the seconds.
 /// mpd uses floats for the current status (e.g. time elapsed in song).
 fn de_time_float<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     f64::deserialize(deserializer)
         .map(Duration::from_secs_f64)
@@ -241,8 +241,8 @@ fn de_time_float<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
 /// mpd uses bints (0 or 1) to represent booleans,
 /// so we need a special parser for those.
 fn de_bint<'de, D>(deserializer: D) -> Result<bool, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     match u8::deserialize(deserializer)? {
         0 => Ok(false),
@@ -253,5 +253,3 @@ fn de_bint<'de, D>(deserializer: D) -> Result<bool, D::Error>
         )),
     }
 }
-
-

@@ -43,9 +43,7 @@ pub struct Filter {
 
 impl Filter {
     pub fn new() -> Self {
-        Self {
-            exprs: Vec::new(),
-        }
+        Self { exprs: Vec::new() }
     }
 
     pub fn with(filter: FilterExpr) -> Self {

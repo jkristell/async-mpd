@@ -7,8 +7,11 @@ use itertools::Itertools;
 use log::{info, warn};
 use std::io;
 
-use crate::{Status, Stats, Subsystem, Track, filter::Filter, response::{self, Mixed}};
-
+use crate::{
+    filter::Filter,
+    response::{self, Mixed},
+    Stats, Status, Subsystem, Track,
+};
 
 /// Mpd Client
 pub struct MpdClient {
@@ -294,9 +297,6 @@ impl MpdClient {
         Ok(())
     }
 }
-
-
-
 
 struct Cmd {
     cmd: &'static str,
