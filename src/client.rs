@@ -105,29 +105,34 @@ impl MpdClient {
 
     pub async fn noidle(&mut self) -> io::Result<()> {
         self.cmd("noidle").await?;
+        self.read_ok_resp().await?;
         Ok(())
     }
 
     pub async fn setvol(&mut self, volume: u32) -> io::Result<()> {
         self.cmd(Cmd::new("setvol", Some(volume))).await?;
+        self.read_ok_resp().await?;
         Ok(())
     }
 
     pub async fn repeat(&mut self, repeat: bool) -> io::Result<()> {
         let repeat = if repeat { 1 } else { 0 };
         self.cmd(Cmd::new("repeat", Some(repeat))).await?;
+        self.read_ok_resp().await?;
         Ok(())
     }
 
     pub async fn random(&mut self, random: bool) -> io::Result<()> {
         let random = if random { 1 } else { 0 };
         self.cmd(Cmd::new("random", Some(random))).await?;
+        self.read_ok_resp().await?;
         Ok(())
     }
 
     pub async fn consume(&mut self, consume: bool) -> io::Result<()> {
         let consume = if consume { 1 } else { 0 };
         self.cmd(Cmd::new("consume", Some(consume))).await?;
+        self.read_ok_resp().await?;
         Ok(())
     }
 
