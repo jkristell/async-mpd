@@ -8,7 +8,7 @@ Async-std based Mpd client library
 ## Example:
 ```rust
 #[async_std::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<(), async_mpd::Error> {
     // Connect to server
     let mut mpd = async_mpd::MpdClient::new("localhost:6600").await?;
 
