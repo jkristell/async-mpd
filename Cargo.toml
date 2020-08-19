@@ -24,6 +24,7 @@ serde_yaml = "0.8"
 serde_with = "1.4.0"
 log = "0.4.8"
 chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0.20"
 
 [dev-dependencies]
 structopt = "0.3"

@@ -1,4 +1,4 @@
-use async_mpd::{Filter, MpdClient, Tag, ToFilterExpr};
+use async_mpd::{Error, Filter, MpdClient, Tag, ToFilterExpr};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -51,7 +51,7 @@ enum Command {
 }
 
 #[async_std::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<(), Error> {
     femme::with_level(log::LevelFilter::Trace);
 
     let opt = Opt::from_args();
