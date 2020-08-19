@@ -7,7 +7,7 @@
 //! use async_mpd::MpdClient;
 //!
 //! #[async_std::main]
-//! async fn main() -> std::io::Result<()> {
+//! async fn main() -> Result<(), async_mpd::Error> {
 //!     // Connect to server
 //!     let mut mpd = MpdClient::new("localhost:6600").await?;
 //!
@@ -39,7 +39,7 @@ use std::time::Duration;
 #[cfg(feature = "client")]
 mod client;
 #[cfg(feature = "client")]
-pub use client::MpdClient;
+pub use {client::Error, client::MpdClient};
 
 #[cfg(feature = "client")]
 mod response;

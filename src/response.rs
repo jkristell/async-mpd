@@ -31,7 +31,11 @@ impl Mixed {
 }
 
 pub(crate) fn tracks(resp: &str) -> Vec<Track> {
-    mixed(resp).iter().filter_map(Mixed::track).cloned().collect()
+    mixed(resp)
+        .iter()
+        .filter_map(Mixed::track)
+        .cloned()
+        .collect()
 }
 
 pub(crate) fn mixed(resp: &str) -> Vec<Mixed> {
