@@ -1,10 +1,10 @@
 use async_std::{
     io::BufReader,
-    net::{TcpStream, ToSocketAddrs},
+    net::{SocketAddr, TcpStream, ToSocketAddrs},
     prelude::*,
 };
 use itertools::Itertools;
-use log::{info};
+use log::info;
 use std::io;
 
 use crate::{
@@ -37,24 +37,35 @@ pub enum Error {
 pub struct MpdClient {
     bufreader: BufReader<TcpStream>,
     version: String,
+    server_address: SocketAddr,
 }
 
 impl MpdClient {
     /// Create a new MpdClient and connect to `addr`
     pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<Self, Error> {
         let stream = TcpStream::connect(addr).await?;
-
-        // Save if we need to reconnect later
+        let server_address = stream.peer_addr()?;
         let bufreader = BufReader::new(stream);
 
         let mut s = Self {
             bufreader,
             version: String::new(),
+            server_address,
         };
 
         s.read_version().await?;
 
         Ok(s)
+    }
+
+    /// Reconnect to server
+    pub async fn reconnect(&mut self) -> Result<(), Error> {
+        let stream = TcpStream::connect(self.server_address).await?;
+        let bufreader = BufReader::new(stream);
+        self.bufreader = bufreader;
+        self.read_version().await?;
+
+        Ok(())
     }
 
     async fn read_version(&mut self) -> Result<(), Error> {
@@ -322,8 +333,8 @@ impl MpdClient {
         if &line != "OK\n" {
             return Err(Error::ResponseError {
                 reply: line.to_string(),
-                errmsg: "Expected OK".to_string()
-            })
+                errmsg: "Expected OK".to_string(),
+            });
         }
 
         Ok(())
