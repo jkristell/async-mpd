@@ -1,11 +1,10 @@
-use async_std::{
-    io::BufReader,
-    net::{SocketAddr, TcpStream, ToSocketAddrs},
-    prelude::*,
-};
+use async_net::{AsyncToSocketAddrs, TcpStream};
+use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
 use itertools::Itertools;
 use log::info;
-use std::io;
+
+use std::{io, net::SocketAddr};
 
 use crate::{
     filter::Filter,
@@ -26,7 +25,7 @@ pub enum Error {
 
     /// Represents all other cases of `std::io::Error`.
     #[error(transparent)]
-    IOError(#[from] std::io::Error),
+    IOError(#[from] io::Error),
 
     /// Failed to parse the reply the server sent
     #[error("Invalid reply to command")]
@@ -42,7 +41,7 @@ pub struct MpdClient {
 
 impl MpdClient {
     /// Create a new MpdClient and connect to `addr`
-    pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<Self, Error> {
+    pub async fn new<A: AsyncToSocketAddrs>(addr: A) -> Result<Self, Error> {
         let stream = TcpStream::connect(addr).await?;
         let server_address = stream.peer_addr()?;
         let bufreader = BufReader::new(stream);
