@@ -1,4 +1,8 @@
-#[async_std::main]
+// To use tokio you would do:
+// use tokio as runtime;
+use async_std as runtime;
+
+#[runtime::main]
 async fn main() -> Result<(), async_mpd::Error> {
     // Connect to server
     let mut mpd = async_mpd::MpdClient::new("localhost:6600").await?;

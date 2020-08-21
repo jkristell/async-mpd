@@ -1,6 +1,10 @@
 use async_mpd::{Error, Filter, MpdClient, Tag, ToFilterExpr};
 use structopt::StructOpt;
 
+// To use tokio you would do:
+// use tokio as runtime;
+use async_std as runtime;
+
 #[derive(StructOpt, Debug)]
 struct Opt {
     #[structopt(name = "host", default_value = "localhost", long)]
@@ -50,7 +54,7 @@ enum Command {
     },
 }
 
-#[async_std::main]
+#[runtime::main]
 async fn main() -> Result<(), Error> {
     femme::with_level(log::LevelFilter::Trace);
 
