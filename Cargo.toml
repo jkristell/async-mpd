@@ -30,4 +30,5 @@ thiserror = "1.0.20"
 [dev-dependencies]
 structopt = "0.3"
 femme = "2.1.0"
-
+async-std = { version = "1.6.3", features = ["attributes"] }
+tokio = { version = "0.2.22", features = ["full"] }
