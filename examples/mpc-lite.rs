@@ -1,4 +1,4 @@
-use async_mpd::{Error, Filter, MpdClient, Tag, ToFilterExpr};
+use async_mpd::{Error, Filter, MixedResponse, MpdClient, Tag, ToFilterExpr};
 use structopt::StructOpt;
 
 // To use tokio you would do:
@@ -11,7 +11,7 @@ struct Opt {
     /// Hostname
     host: String,
     #[structopt(name = "port", default_value = "6600", long)]
-    /// The faerie tree this cookie is being made in.
+    /// Port
     port: String,
     #[structopt(subcommand)]
     cmd: Command,
@@ -30,6 +30,7 @@ enum Command {
         id: u32,
     },
     Pause,
+    Stop,
     /// Next
     Next,
     /// Clear the queue
@@ -56,7 +57,7 @@ enum Command {
 
 #[runtime::main]
 async fn main() -> Result<(), Error> {
-    femme::with_level(log::LevelFilter::Trace);
+    femme::with_level(log::LevelFilter::Debug);
 
     let opt = Opt::from_args();
 
@@ -86,6 +87,9 @@ async fn main() -> Result<(), Error> {
         }
         Command::Pause => {
             client.pause().await?;
+        }
+        Command::Stop => {
+            client.stop().await?;
         }
         Command::Clear => {
             client.queue_clear().await?;
@@ -138,7 +142,11 @@ async fn main() -> Result<(), Error> {
             let res = client.listallinfo(path.as_deref()).await?;
 
             for t in res {
-                println!("{:#?}", t);
+                match t {
+                    MixedResponse::File(t) => println!("File: {}", t.file),
+                    MixedResponse::Directory(d) => println!("directory: {}", d.path),
+                    MixedResponse::Playlist(pl) => println!("playlist: {}", pl.path),
+                }
             }
         }
     }

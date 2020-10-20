@@ -15,8 +15,8 @@ async fn main() -> Result<(), async_mpd::Error> {
         println!(
             "{:3}: {} - {}",
             track.id.unwrap(),
-            track.artist.unwrap_or_default(),
-            track.title.unwrap_or_default(),
+            track.artist.unwrap_or_else(|| "<NoArtist>".to_string()),
+            track.title.unwrap_or_else(|| "<NoTitle>".to_string()),
         );
     }
 

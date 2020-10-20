@@ -1,14 +1,15 @@
 use async_net::{AsyncToSocketAddrs, TcpStream};
-use futures::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use futures_lite::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use itertools::Itertools;
-use log::info;
 
+use std::str::FromStr;
 use std::{io, net::SocketAddr};
 
+use crate::client::respmap::RespMap;
 use crate::{
-    filter::Filter,
-    response::{self, Mixed},
+    client::responses::{self, MixedResponse},
+    client::Filter,
     Stats, Status, Subsystem, Track,
 };
 
@@ -30,6 +31,10 @@ pub enum Error {
     /// Failed to parse the reply the server sent
     #[error("Invalid reply to command")]
     ResponseError { reply: String, errmsg: String },
+
+    /// Generic unexpected response error
+    #[error("invalid value error")]
+    ValueError { msg: String },
 }
 
 /// Mpd Client
@@ -69,7 +74,7 @@ impl MpdClient {
 
     async fn read_version(&mut self) -> Result<(), Error> {
         self.version = self.read_resp_line().await?;
-        info!("version: {}", self.version);
+        log::debug!("Connected: {}", self.version);
         Ok(())
     }
 
@@ -77,19 +82,17 @@ impl MpdClient {
     pub async fn stats(&mut self) -> Result<Stats, Error> {
         self.cmd("stats").await?;
         let lines = self.read_resp().await?;
-        serde_yaml::from_str(&lines).map_err(|err| Error::ResponseError {
-            reply: lines,
-            errmsg: err.to_string(),
-        })
+
+        let map = RespMap::from_string(lines);
+        Ok(map.into())
     }
 
     pub async fn status(&mut self) -> Result<Status, Error> {
         self.cmd("status").await?;
         let lines = self.read_resp().await?;
-        serde_yaml::from_str(&lines).map_err(|err| Error::ResponseError {
-            reply: lines,
-            errmsg: err.to_string(),
-        })
+
+        let map = RespMap::from_string(lines);
+        Ok(map.into())
     }
 
     pub async fn update(&mut self, path: Option<&str>) -> Result<i32, Error> {
@@ -116,7 +119,7 @@ impl MpdClient {
         Ok(db_version)
     }
 
-    pub async fn idle(&mut self) -> Result<Option<Subsystem>, Error> {
+    pub async fn idle(&mut self) -> Result<Subsystem, Error> {
         self.cmd("idle").await?;
         let resp = self.read_resp().await?;
         let mut lines = resp.lines();
@@ -129,45 +132,40 @@ impl MpdClient {
         if let Some((k, v)) = line.splitn(2, ": ").next_tuple() {
             if k != "changed" {
                 log::warn!("k not changed");
-                return Ok(None);
+                return Err(Error::CommandError {
+                    msg: "".to_string(),
+                });
             }
 
-            return Ok(serde_yaml::from_str(v).ok());
+            let subsystem = Subsystem::from_str(v)?;
+            return Ok(subsystem);
         }
-        Ok(None)
+        Err(Error::CommandError {
+            msg: "".to_string(),
+        })
     }
 
     pub async fn noidle(&mut self) -> Result<(), Error> {
-        self.cmd("noidle").await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        self.okcmd("noidle").await
     }
 
     pub async fn setvol(&mut self, volume: u32) -> Result<(), Error> {
-        self.cmd(Cmd::new("setvol", Some(volume))).await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        self.okcmd(Cmd::new("setvol", Some(volume))).await
     }
 
     pub async fn repeat(&mut self, repeat: bool) -> Result<(), Error> {
-        let repeat = if repeat { 1 } else { 0 };
-        self.cmd(Cmd::new("repeat", Some(repeat))).await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        let repeat: i32 = repeat.into();
+        self.okcmd(Cmd::new("repeat", Some(repeat))).await
     }
 
     pub async fn random(&mut self, random: bool) -> Result<(), Error> {
-        let random = if random { 1 } else { 0 };
-        self.cmd(Cmd::new("random", Some(random))).await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        let random: i32 = random.into();
+        self.okcmd(Cmd::new("random", Some(random))).await
     }
 
     pub async fn consume(&mut self, consume: bool) -> Result<(), Error> {
-        let consume = if consume { 1 } else { 0 };
-        self.cmd(Cmd::new("consume", Some(consume))).await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        let consume: i32 = consume.into();
+        self.okcmd(Cmd::new("consume", Some(consume))).await
     }
 
     // Playback controls
@@ -177,8 +175,7 @@ impl MpdClient {
     }
 
     pub async fn playid(&mut self, id: u32) -> Result<(), Error> {
-        self.cmd(Cmd::new("playid", Some(id))).await?;
-        self.read_ok_resp().await?;
+        self.okcmd(Cmd::new("playid", Some(id))).await?;
         Ok(())
     }
 
@@ -187,31 +184,25 @@ impl MpdClient {
     }
 
     pub async fn play_pause(&mut self, play: bool) -> Result<(), Error> {
-        let play = if play { 0 } else { 1 };
-        self.cmd(Cmd::new("pause", Some(play))).await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        let play: i32 = (!play).into();
+        self.okcmd(Cmd::new("pause", Some(play))).await
     }
 
     pub async fn next(&mut self) -> Result<(), Error> {
-        self.cmd("next").await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        self.okcmd("next").await
     }
 
     pub async fn prev(&mut self) -> Result<(), Error> {
-        self.cmd("prev").await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        self.okcmd("prev").await
     }
 
     pub async fn stop(&mut self) -> Result<(), Error> {
-        self.cmd("stop").await?;
-        self.read_ok_resp().await?;
-        Ok(())
+        self.okcmd("stop").await
     }
 
+    //
     // Music database commands
+    //
 
     pub async fn listall(&mut self, path: Option<String>) -> Result<Vec<String>, Error> {
         self.cmd(Cmd::new("listall", path)).await?;
@@ -230,31 +221,24 @@ impl MpdClient {
             .collect())
     }
 
-    pub async fn listallinfo(&mut self, path: Option<&str>) -> Result<Vec<Mixed>, Error> {
+    pub async fn listallinfo(&mut self, path: Option<&str>) -> Result<Vec<MixedResponse>, Error> {
         self.cmd(Cmd::new("listallinfo", path)).await?;
-
-        let resp = self.read_resp().await?;
-        let r = response::mixed(&resp);
-        Ok(r)
+        Ok(responses::mixed_stream(&mut self.bufreader).await?)
     }
 
     // Queue handling commands
 
     pub async fn queue_add(&mut self, path: &str) -> Result<(), Error> {
-        self.cmd(Cmd::new("add", Some(path))).await?;
-        self.read_ok_resp().await
+        self.okcmd(Cmd::new("add", Some(path))).await
     }
 
     pub async fn queue_clear(&mut self) -> Result<(), Error> {
-        self.cmd("clear").await?;
-        self.read_ok_resp().await
+        self.okcmd("clear").await
     }
 
     pub async fn queue(&mut self) -> Result<Vec<Track>, Error> {
         self.cmd("playlistinfo").await?;
-        let resp = self.read_resp().await?;
-        let vec = response::tracks(&resp);
-        Ok(vec)
+        Ok(responses::tracks(&mut self.bufreader).await?)
     }
 
     /// # Example
@@ -278,14 +262,21 @@ impl MpdClient {
     /// ```
     pub async fn search(&mut self, filter: &Filter) -> Result<Vec<Track>, Error> {
         self.cmd(Cmd::new("search", filter.to_query())).await?;
-        let resp = self.read_resp().await?;
-        let tracks = response::tracks(&resp);
+        let tracks = responses::tracks(&mut self.bufreader).await?;
         Ok(tracks)
     }
 
     async fn cmd(&mut self, cmd: impl Into<Cmd>) -> io::Result<()> {
         let r = cmd.into().to_string();
         self.bufreader.get_mut().write_all(r.as_bytes()).await?;
+        Ok(())
+    }
+
+    async fn okcmd(&mut self, cmd: impl Into<Cmd>) -> Result<(), Error> {
+        let r = cmd.into().to_string();
+        log::debug!("cmd: {}", r);
+        self.bufreader.get_mut().write_all(r.as_bytes()).await?;
+        self.read_ok_resp().await?;
         Ok(())
     }
 
