@@ -1,12 +1,13 @@
+use std::str::FromStr;
+
 use async_net::TcpStream;
 use futures_lite::{io::AsyncBufReadExt, io::BufReader, StreamExt};
 use itertools::Itertools;
 use serde::Serialize;
 
-use crate::client::respmap::RespMap;
-use crate::{Directory, Playlist, Subsystem, Track, State};
-use crate::{Stats, Status};
-use std::str::FromStr;
+use crate::{
+    client::respmap::RespMap, Directory, Playlist, State, Stats, Status, Subsystem, Track,
+};
 
 impl FromStr for Subsystem {
     type Err = crate::Error;
@@ -34,12 +35,11 @@ impl FromStr for State {
             "play" => State::Play,
             "pause" => State::Pause,
             "stop" => State::Stop,
-            _ => return Err(crate::Error::ValueError { msg: s.into()}),
+            _ => return Err(crate::Error::ValueError { msg: s.into() }),
         };
         Ok(status)
     }
 }
-
 
 #[derive(Serialize, Debug)]
 /// Response from commands that returns entries with metadata and tags
@@ -135,6 +135,8 @@ pub async fn mixed_stream(
     while let Some(line) = lines.next().await {
         let line = line?;
         let line = line.trim();
+
+        log::debug!("{}", line);
 
         if line == "OK" {
             // We're done
