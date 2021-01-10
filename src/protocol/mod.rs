@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use smart_default::SmartDefault;
+use std::time::Duration;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 /// Playlist on the server
