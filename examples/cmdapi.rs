@@ -1,8 +1,9 @@
-use async_mpd::{Command, CommandResponse, Error, MpdClient};
+use async_mpd::{cmd, Error, MpdClient, ResponseHandler, WrappedResponse};
 use structopt::StructOpt;
 
 // To use tokio you would do:
 // use tokio as runtime;
+use async_mpd::cmd::MpdCmd;
 use async_std as runtime;
 use std::time::Duration;
 
@@ -18,48 +19,45 @@ struct Opt {
 
 #[runtime::main]
 async fn main() -> Result<(), Error> {
-    femme::with_level(log::LevelFilter::Debug);
-
-    // Example that plays 10s of every song in the playlist using the command api
+    femme::with_level(log::LevelFilter::Warn);
 
     let opt = Opt::from_args();
 
     let addr = format!("{}:{}", opt.host, opt.port);
-    let mut mpd = MpdClient::new(&addr).await?;
+    let mut mpd = MpdClient::new();
 
-    let mut even = true;
+    mpd.connect(&addr).await?;
 
-    execute(&mut mpd, &Command::PlayId(1)).await?;
+    // Response with known type
+    let _status = dispatcher(&mut mpd, cmd::Status).await?;
 
+    let mut flip = true;
     loop {
-        let cmd = if even { Command::Status } else { Command::Next };
+        let resp = if flip {
+            enum_dispatcher(&mut mpd, cmd::Status).await?
+        } else {
+            enum_dispatcher(&mut mpd, cmd::Stats).await?
+        };
 
-        even = !even;
+        match resp {
+            WrappedResponse::Status(s) => println!("{:?}", s),
+            WrappedResponse::Stats(s) => println!("{:?}", s),
+            _ => (),
+        };
 
-        let res = execute(&mut mpd, &cmd).await?;
-
-        match res {
-            CommandResponse::Status(s) => {
-                println!("Play state: {:?}", s.state)
-            }
-            CommandResponse::Ok => {
-                println!("Next")
-            }
-            _ => unreachable!(),
-        }
-
+        flip = !flip;
         runtime::task::sleep(Duration::from_secs(5)).await;
     }
 }
 
-async fn execute(
+async fn enum_dispatcher<C: MpdCmd + Copy>(
     mpd: &mut MpdClient,
-    cmd: &Command<'_>,
-) -> Result<CommandResponse, async_mpd::Error> {
+    cmd: C,
+) -> Result<WrappedResponse, async_mpd::Error> {
     let mut tries = 0;
 
     let ret = loop {
-        match mpd.cmd(cmd).await {
+        match mpd.exec_wrapped(cmd).await {
             Ok(resp) => break Ok(resp),
             Err(Error::Disconnected) => {
                 println!("Server disconnected. Trying to reconnect");
@@ -67,13 +65,42 @@ async fn execute(
             }
             Err(other) => {
                 println!("Error: {:?}", other);
-                break Err(async_mpd::Error::Disconnected);
+                break Err(other);
             }
         }
 
         tries += 1;
 
-        if tries > 3 {
+        if tries == 3 {
+            break Err(Error::Disconnected);
+        }
+    };
+
+    ret
+}
+
+async fn dispatcher<C: MpdCmd + Copy>(
+    mpd: &mut MpdClient,
+    cmd: C,
+) -> Result<<C::Handler as ResponseHandler>::Response, async_mpd::Error> {
+    let mut tries = 0;
+
+    let ret = loop {
+        match mpd.exec(cmd).await {
+            Ok(resp) => break Ok(resp),
+            Err(Error::Disconnected) => {
+                println!("Server disconnected. Trying to reconnect");
+                mpd.reconnect().await?;
+            }
+            Err(other) => {
+                println!("Error: {:?}", other);
+                break Err(other);
+            }
+        }
+
+        tries += 1;
+
+        if tries == 3 {
             break Err(Error::Disconnected);
         }
     };

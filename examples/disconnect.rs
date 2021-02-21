@@ -1,4 +1,4 @@
-use async_mpd::Error;
+use async_mpd::{Error, MpdClient};
 use std::time::Duration;
 
 // To use tokio you would do:
@@ -7,8 +7,13 @@ use async_std as runtime;
 
 #[runtime::main]
 async fn main() -> Result<(), Error> {
+    femme::with_level(log::LevelFilter::Debug);
     // Connect to server
-    let mut mpd = async_mpd::MpdClient::new("localhost:6600").await?;
+    let mut mpd = MpdClient::new();
+
+    let addr = "localhost:6600";
+
+    mpd.connect(addr).await?;
 
     loop {
         let status = match mpd.status().await {
@@ -27,7 +32,7 @@ async fn main() -> Result<(), Error> {
         println!("Status: {:?}", status);
 
         // The mpd server closes connection without activity after a configurable amount of time
-        runtime::task::sleep(Duration::from_secs(120)).await;
+        runtime::task::sleep(Duration::from_secs(12)).await;
     }
 
     Ok(())
