@@ -1,4 +1,4 @@
-use async_mpd::{Error, Filter, MixedResponse, MpdClient, Tag, ToFilterExpr};
+use async_mpd::{Error, Filter, MpdClient, Tag, ToFilterExpr};
 use structopt::StructOpt;
 
 // To use tokio you would do:
@@ -62,7 +62,8 @@ async fn main() -> Result<(), Error> {
     let opt = Opt::from_args();
 
     let addr = format!("{}:{}", opt.host, opt.port);
-    let mut client = MpdClient::new(&addr).await?;
+    let mut client = MpdClient::new();
+    client.connect(&addr).await?;
 
     match opt.cmd {
         Command::Status => {
@@ -98,9 +99,14 @@ async fn main() -> Result<(), Error> {
             client.setvol(vol).await?;
         }
         Command::Listall { path } => {
-            let files = client.listall(path).await?;
-            for f in files {
-                println!("{}", f);
+            let r = client.listall(path.as_deref()).await?;
+            println!("Dirs:");
+            for f in &r.dirs {
+                println!(" {}", f);
+            }
+            println!("Files:");
+            for f in &r.files {
+                println!(" {}", f);
             }
         }
         Command::Queue => {
@@ -115,11 +121,11 @@ async fn main() -> Result<(), Error> {
         },
         Command::Update => {
             let dbv = client.update(None).await?;
-            println!("Update id: {}", dbv);
+            println!("Update id: {}", dbv.0);
         }
         Command::Rescan => {
             let dbv = client.rescan(None).await?;
-            println!("Rescan id: {}", dbv);
+            println!("Rescan id: {}", dbv.0);
         }
         Command::Search { artist, album } => {
             use Tag::*;
@@ -141,12 +147,8 @@ async fn main() -> Result<(), Error> {
         Command::Lsinfo { path } => {
             let res = client.listallinfo(path.as_deref()).await?;
 
-            for t in res {
-                match t {
-                    MixedResponse::File(t) => println!("File: {}", t.file),
-                    MixedResponse::Directory(d) => println!("directory: {}", d.path),
-                    MixedResponse::Playlist(pl) => println!("playlist: {}", pl.path),
-                }
+            for t in res.dirs {
+                println!("directory: {}", t.path);
             }
         }
     }

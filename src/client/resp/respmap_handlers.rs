@@ -2,18 +2,17 @@ use std::str::FromStr;
 
 use async_net::TcpStream;
 use futures_lite::{io::AsyncBufReadExt, io::BufReader, StreamExt};
-use itertools::Itertools;
 use serde::Serialize;
 
-use crate::{
-    client::respmap::RespMap, Directory, Playlist, State, Stats, Status, Subsystem, Track,
-};
+use crate::client::resp::respmap::RespMap;
+use crate::{DatabaseVersion, Directory, Playlist, State, Stats, Status, Subsystem, Track};
+use std::convert::TryFrom;
 
-impl FromStr for Subsystem {
-    type Err = crate::Error;
+impl From<RespMap> for Subsystem {
+    fn from(mut map: RespMap) -> Self {
+        let s: String = map.get("subsystem").unwrap_or("other".into());
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let r = match s {
+        match s.as_ref() {
             "partitions" => Subsystem::Partitions,
             "player" => Subsystem::Player,
             "mixer" => Subsystem::Mixer,
@@ -21,9 +20,34 @@ impl FromStr for Subsystem {
             "update" => Subsystem::Update,
             "storedplaylist" => Subsystem::StoredPlaylist,
             "output" => Subsystem::Output,
-            _ => return Err(crate::Error::ValueError { msg: s.into() }),
-        };
-        Ok(r)
+            _ => Subsystem::Other,
+        }
+    }
+}
+
+pub struct ListallResponse {
+    pub files: Vec<String>,
+    pub dirs: Vec<String>,
+    pub playlists: Vec<String>,
+}
+
+impl From<RespMap> for ListallResponse {
+    fn from(mut map: RespMap) -> Self {
+        let files = map.get_vec("file");
+        let dirs = map.get_vec("directory");
+        let playlists = map.get_vec("playlist");
+        ListallResponse {
+            files,
+            dirs,
+            playlists,
+        }
+    }
+}
+
+impl From<RespMap> for DatabaseVersion {
+    fn from(mut map: RespMap) -> Self {
+        let v = map.get_def("updating_db");
+        DatabaseVersion(v)
     }
 }
 
@@ -49,38 +73,8 @@ pub enum MixedResponse {
     Playlist(Playlist),
 }
 
-impl MixedResponse {
-    /// Try to convert to Track
-    pub fn track(&self) -> Option<&Track> {
-        match self {
-            MixedResponse::File(t) => Some(t),
-            _ => None,
-        }
-    }
-    /// Try to convert to Directory
-    pub fn directory(&self) -> Option<&Directory> {
-        match self {
-            MixedResponse::Directory(d) => Some(d),
-            _ => None,
-        }
-    }
-
-    pub fn playlist(&self) -> Option<&Playlist> {
-        if let MixedResponse::Playlist(playlist) = self {
-            Some(playlist)
-        } else {
-            None
-        }
-    }
-}
-
 pub(crate) async fn tracks(stream: &mut BufReader<TcpStream>) -> std::io::Result<Vec<Track>> {
-    Ok(mixed_stream(stream)
-        .await?
-        .iter()
-        .filter_map(MixedResponse::track)
-        .cloned()
-        .collect())
+    Ok(mixed_stream(stream).await?.files)
 }
 
 impl From<RespMap> for Directory {
@@ -113,22 +107,36 @@ impl From<RespMap> for Playlist {
     }
 }
 
-impl From<RespMap> for MixedResponse {
-    fn from(map: RespMap) -> Self {
+pub struct ListallinfoResponse {
+    pub files: Vec<Track>,
+    pub dirs: Vec<Directory>,
+    pub playlist: Vec<Playlist>,
+}
+
+impl TryFrom<RespMap> for MixedResponse {
+    type Error = ();
+
+    fn try_from(map: RespMap) -> Result<Self, Self::Error> {
         if map.contains_key("directory") {
-            MixedResponse::Directory(Directory::from(map))
+            Ok(MixedResponse::Directory(Directory::from(map)))
         } else if map.contains_key("playlist") {
-            MixedResponse::Playlist(Playlist::from(map))
+            Ok(MixedResponse::Playlist(Playlist::from(map)))
+        } else if map.contains_key("file") {
+            Ok(MixedResponse::File(Track::from(map)))
         } else {
-            MixedResponse::File(Track::from(map))
+            Err(())
         }
     }
 }
 
 pub async fn mixed_stream(
     stream: &mut BufReader<TcpStream>,
-) -> std::io::Result<Vec<MixedResponse>> {
-    let mut resvec = Vec::new();
+) -> std::io::Result<ListallinfoResponse> {
+    let mut resvec = ListallinfoResponse {
+        files: vec![],
+        dirs: vec![],
+        playlist: vec![],
+    };
     let mut map = RespMap::new();
     let mut lines = stream.lines();
 
@@ -140,7 +148,16 @@ pub async fn mixed_stream(
 
         if line == "OK" {
             // We're done
-            resvec.push(MixedResponse::from(map));
+
+            if let Ok(dtp) = MixedResponse::try_from(map) {
+                match dtp {
+                    MixedResponse::File(t) => resvec.files.push(t),
+                    MixedResponse::Directory(d) => resvec.dirs.push(d),
+                    MixedResponse::Playlist(pl) => resvec.playlist.push(pl),
+                }
+            }
+
+            // Add the previous record to the result vec
             break;
         }
 
@@ -149,13 +166,20 @@ pub async fn mixed_stream(
                 || line.starts_with("file:")
                 || line.starts_with("playlist:"))
         {
-            // Add the previous record to the result vec
-            resvec.push(MixedResponse::from(map));
+            if let Ok(dtp) = MixedResponse::try_from(map) {
+                // Add the previous record to the result vec
+                match dtp {
+                    MixedResponse::File(t) => resvec.files.push(t),
+                    MixedResponse::Directory(d) => resvec.dirs.push(d),
+                    MixedResponse::Playlist(pl) => resvec.playlist.push(pl),
+                }
+            }
+
             // Open a new record
             map = RespMap::new();
         }
 
-        if let Some((k, v)) = line.splitn(2, ": ").next_tuple() {
+        if let Some((k, v)) = line.split_once(": ") {
             map.insert(k, v);
         }
     }
@@ -261,7 +285,7 @@ impl From<RespMap> for Stats {
 
 #[cfg(test)]
 mod test {
-    use crate::client::respmap::RespMap;
+    use crate::client::resp::respmap::RespMap;
     use crate::{State, Status};
     use std::time::Duration;
 

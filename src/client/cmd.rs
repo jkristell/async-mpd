@@ -1,179 +1,221 @@
-use crate::{MixedResponse, Track};
+use crate::client::resp::handlers::{
+    MixedResponseResponse, OkResponse, RespMapResponse, ResponseHandler, Tracks,
+};
+use crate::client::resp::respmap_handlers::ListallResponse;
+use crate::DatabaseVersion;
 
-pub enum Command<'a> {
-    Stats,
-    Status,
-    Update(Option<&'a str>),
-    Rescan(Option<&'a str>),
-    Idle,
-    NoIdle,
-    Repeat(bool),
-    Random(bool),
-    Consume(bool),
+#[derive(Copy, Clone)]
+pub struct Stats;
+#[derive(Copy, Clone)]
+pub struct Status;
 
-    PlayPaus(bool),
-    Next,
-    Prev,
-    Stop,
+#[derive(Copy, Clone)]
+pub struct Setvol(pub u32);
+#[derive(Copy, Clone)]
+pub struct Repeat(pub bool);
+#[derive(Copy, Clone)]
+pub struct Random(pub bool);
+#[derive(Copy, Clone)]
+pub struct Consume(pub bool);
 
-    Listall(Option<String>),
+#[derive(Copy, Clone)]
+pub struct PlayId(pub u32);
+#[derive(Copy, Clone)]
+pub struct QueueClear;
+#[derive(Copy, Clone)]
+pub struct QueueAdd<'a>(pub &'a str);
 
-    QueueAdd(&'a str),
-    QueueClear,
+#[derive(Copy, Clone)]
+pub struct Search<'a>(pub Option<&'a str>);
+#[derive(Copy, Clone)]
+pub struct PlaylistInfo;
 
-    Search(Option<String>),
+#[derive(Copy, Clone)]
+pub struct Stop;
+#[derive(Copy, Clone)]
+pub struct PlayPause(pub bool);
+#[derive(Copy, Clone)]
+pub struct Next;
+#[derive(Copy, Clone)]
+pub struct Prev;
 
-    SetVol(u32),
-    PlayId(u32),
-    ListallInfo(Option<&'a str>),
-    PlaylistInfo,
-}
+#[derive(Copy, Clone)]
+pub struct Rescan<'a>(pub Option<&'a str>);
+#[derive(Copy, Clone)]
+pub struct Update<'a>(pub Option<&'a str>);
 
-pub enum CommandResponse {
-    Stats(crate::Stats),
-    Status(crate::Status),
-    DbVersion(i32),
-    Subsystem(crate::Subsystem),
-    Ok,
-    Mixed(Vec<MixedResponse>),
-    Tracks(Vec<Track>),
-    Paths(Vec<String>),
-}
+#[derive(Copy, Clone)]
+pub struct Idle;
+#[derive(Copy, Clone)]
+pub struct NoIdle;
 
-impl From<CommandResponse> for crate::Stats {
-    fn from(r: CommandResponse) -> crate::Stats {
-        match r {
-            CommandResponse::Stats(stats) => stats,
-            _ => unreachable!(),
-        }
+#[derive(Copy, Clone)]
+pub struct Listall<'a>(pub Option<&'a str>);
+#[derive(Copy, Clone)]
+pub struct ListallInfo<'a>(pub Option<&'a str>);
+
+pub trait MpdCmd {
+    /// The Command name
+    const CMD: &'static str;
+    /// The Response handler for this command
+    type Handler: ResponseHandler;
+
+    fn argument(&self) -> Option<String> {
+        None
     }
-}
 
-impl From<CommandResponse> for crate::Status {
-    fn from(r: CommandResponse) -> crate::Status {
-        match r {
-            CommandResponse::Status(status) => status,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<CommandResponse> for crate::Subsystem {
-    fn from(r: CommandResponse) -> crate::Subsystem {
-        match r {
-            CommandResponse::Subsystem(subsystem) => subsystem,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<CommandResponse> for i32 {
-    fn from(r: CommandResponse) -> i32 {
-        match r {
-            CommandResponse::DbVersion(version) => version,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<CommandResponse> for Vec<String> {
-    fn from(r: CommandResponse) -> Vec<String> {
-        match r {
-            CommandResponse::Paths(v) => v,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<CommandResponse> for Vec<MixedResponse> {
-    fn from(r: CommandResponse) -> Vec<MixedResponse> {
-        match r {
-            CommandResponse::Mixed(v) => v,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<CommandResponse> for () {
-    fn from(r: CommandResponse) -> () {
-        match r {
-            CommandResponse::Ok => (),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<CommandResponse> for Vec<Track> {
-    fn from(cr: CommandResponse) -> Vec<Track> {
-        match cr {
-            CommandResponse::Tracks(tracks) => tracks,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Command<'_> {
-    pub fn line(&self) -> String {
-        let cmdname = self.cmdname();
-
-        let args = match self {
-            Command::PlayId(id) | Command::SetVol(id) => Some(id.to_string()),
-            Command::Consume(enable)
-            | Command::Repeat(enable)
-            | Command::Random(enable)
-            | Command::PlayPaus(enable) => Some((*enable as i32).to_string()),
-
-            Command::QueueAdd(path) => Some(path.to_string()),
-            Command::ListallInfo(maybe) | Command::Update(maybe) | Command::Rescan(maybe) => {
-                maybe.map(ToString::to_string)
-            }
-
-            Command::Search(maybe) | Command::Listall(maybe) => maybe.clone(),
-
-            Command::PlaylistInfo
-            | Command::Stats
-            | Command::Status
-            | Command::Idle
-            | Command::NoIdle
-            | Command::Next
-            | Command::Prev
-            | Command::Stop
-            | Command::QueueClear => None,
-        };
-
-        if let Some(arg) = args {
-            format!("{} \"{}\"\n", cmdname, arg)
+    fn to_cmdline(&self) -> String {
+        if let Some(arg) = self.argument() {
+            format!("{} \"{}\"\n", Self::CMD, arg)
         } else {
-            format!("{}\n", cmdname)
+            format!("{}\n", Self::CMD)
         }
     }
+}
 
-    pub fn cmdname(&self) -> &'static str {
-        match self {
-            Command::Stats => "stats",
-            Command::Status => "status",
-            Command::Update(_) => "update",
-            Command::Rescan(_) => "rescan",
-            Command::Idle => "idle",
-            Command::NoIdle => "noidle",
-            Command::Repeat(_) => "repeat",
-            Command::Random(_) => "random",
-            Command::Consume(_) => "consume",
-            Command::Next => "next",
-            Command::Prev => "prev",
-            Command::Stop => "stop",
-            Command::PlayPaus(_) => "pause",
+impl<'a> MpdCmd for ListallInfo<'a> {
+    const CMD: &'static str = "listallinfo";
+    type Handler = MixedResponseResponse;
 
-            Command::Search(_) => "search",
+    fn argument(&self) -> Option<String> {
+        self.0.map(ToString::to_string)
+    }
+}
 
-            Command::QueueAdd(_) => "add",
-            Command::QueueClear => "clear",
+impl<'a> MpdCmd for QueueAdd<'a> {
+    const CMD: &'static str = "add";
+    type Handler = OkResponse;
 
-            Command::SetVol(_) => "setvol",
-            Command::PlayId(_) => "playid",
-            Command::Listall(_) => "listall",
-            Command::ListallInfo(_) => "listallinfo",
-            Command::PlaylistInfo => "playlistinfo",
-        }
+    fn argument(&self) -> Option<String> {
+        Some(self.0.to_string())
+    }
+}
+
+impl<'a> MpdCmd for Listall<'a> {
+    const CMD: &'static str = "listall";
+    type Handler = RespMapResponse<ListallResponse>;
+
+    fn argument(&self) -> Option<String> {
+        self.0.map(ToString::to_string)
+    }
+}
+
+impl<'a> MpdCmd for Update<'a> {
+    const CMD: &'static str = "update";
+    type Handler = RespMapResponse<DatabaseVersion>;
+
+    fn argument(&self) -> Option<String> {
+        self.0.map(ToString::to_string)
+    }
+}
+
+impl<'a> MpdCmd for Rescan<'a> {
+    const CMD: &'static str = "rescan";
+    type Handler = RespMapResponse<DatabaseVersion>;
+
+    fn argument(&self) -> Option<String> {
+        self.0.map(ToString::to_string)
+    }
+}
+
+impl<'a> MpdCmd for Search<'a> {
+    const CMD: &'static str = "search";
+    type Handler = Tracks;
+    fn argument(&self) -> Option<String> {
+        self.0.map(ToString::to_string)
+    }
+}
+
+impl MpdCmd for PlaylistInfo {
+    const CMD: &'static str = "playlistinfo";
+    type Handler = Tracks;
+}
+
+impl MpdCmd for Repeat {
+    const CMD: &'static str = "repeat";
+    type Handler = OkResponse;
+    fn argument(&self) -> Option<String> {
+        Some((self.0 as u32).to_string())
+    }
+}
+
+impl MpdCmd for Random {
+    const CMD: &'static str = "random";
+    type Handler = OkResponse;
+    fn argument(&self) -> Option<String> {
+        Some((self.0 as u32).to_string())
+    }
+}
+
+impl MpdCmd for Consume {
+    const CMD: &'static str = "consume";
+    type Handler = OkResponse;
+    fn argument(&self) -> Option<String> {
+        Some((self.0 as u32).to_string())
+    }
+}
+
+impl MpdCmd for PlayPause {
+    const CMD: &'static str = "pause";
+    type Handler = OkResponse;
+    fn argument(&self) -> Option<String> {
+        Some((self.0 as u32).to_string())
+    }
+}
+
+impl MpdCmd for Next {
+    const CMD: &'static str = "next";
+    type Handler = OkResponse;
+}
+impl MpdCmd for Prev {
+    const CMD: &'static str = "prev";
+    type Handler = OkResponse;
+}
+
+impl MpdCmd for QueueClear {
+    const CMD: &'static str = "clear";
+    type Handler = OkResponse;
+}
+
+impl MpdCmd for NoIdle {
+    const CMD: &'static str = "noidle";
+    type Handler = OkResponse;
+}
+
+impl MpdCmd for Idle {
+    const CMD: &'static str = "idle";
+    type Handler = RespMapResponse<crate::Subsystem>;
+}
+
+impl MpdCmd for Stats {
+    const CMD: &'static str = "stats";
+    type Handler = RespMapResponse<crate::Stats>;
+}
+
+impl MpdCmd for Status {
+    const CMD: &'static str = "status";
+    type Handler = RespMapResponse<crate::Status>;
+}
+
+impl MpdCmd for Setvol {
+    const CMD: &'static str = "setvol";
+    type Handler = OkResponse;
+
+    fn argument(&self) -> Option<String> {
+        Some(self.0.to_string())
+    }
+}
+
+impl MpdCmd for Stop {
+    const CMD: &'static str = "stop";
+    type Handler = OkResponse;
+}
+
+impl MpdCmd for PlayId {
+    const CMD: &'static str = "playid";
+    type Handler = OkResponse;
+
+    fn argument(&self) -> Option<String> {
+        Some(self.0.to_string())
     }
 }

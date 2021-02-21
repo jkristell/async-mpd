@@ -1,14 +1,13 @@
-mod client;
-pub use client::*;
-
+pub mod cmd;
+mod error;
 mod filter;
-pub use filter::*;
-
+mod mpdclient;
 pub(crate) mod resp;
-mod respmap;
-pub use resp::MixedResponse;
+//pub(crate) mod io;
 
-mod cmd;
-pub use cmd::{Command, CommandResponse};
+pub use error::Error;
+pub use filter::*;
+pub use mpdclient::*;
 
-pub(crate) mod io;
+pub use resp::handlers::ResponseHandler;
+pub use resp::EnumResponse;

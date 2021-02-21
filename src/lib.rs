@@ -10,7 +10,8 @@
 //! #[runtime::main]
 //! async fn main() -> Result<(), async_mpd::Error> {
 //!     // Connect to server
-//!     let mut mpd = MpdClient::new("localhost:6600").await?;
+//!     let mut mpd = MpdClient::new();
+//!     mpd.connect("localhost:6600").await?;
 //!
 //!     // Get all tracks in the play queue and display them
 //!     let queue = mpd.queue().await?;
@@ -39,7 +40,8 @@
 //! #[runtime::main]
 //! async fn main() -> Result<(), async_mpd::Error> {
 //!     // Connect to server
-//!     let mut mpd = MpdClient::new("localhost:6600").await?;
+//!     let mut mpd = MpdClient::new();
+//!     mpd.connect("localhost:6600").await?;
 //!
 //!     // Get all tracks in the play queue and display them
 //!     let queue = mpd.queue().await?;
@@ -63,10 +65,10 @@
 //! }
 //! ```
 
-mod protocol;
-pub use protocol::*;
-
 #[cfg(feature = "client")]
 mod client;
+mod protocol;
+
 #[cfg(feature = "client")]
 pub use client::*;
+pub use protocol::*;
