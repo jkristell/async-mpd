@@ -11,11 +11,23 @@ use crate::{
     client::{resp::mixed_stream, respmap::RespMap, Command, CommandResponse},
     resp, Error,
 };
+use crate::cmd::MpdCommandG;
 
 pub async fn send_command(line: &str, reader: &mut BufReader<TcpStream>) -> std::io::Result<()> {
     // Get the underlying TcpStrem and write command to the socket
     reader.get_mut().write_all(line.as_bytes()).await
 }
+
+pub async fn handle_resp_g<C: MpdCommandG>(
+    cmd: &C,
+    reader: &mut BufReader<TcpStream>,
+) -> Result<CommandResponse, crate::Error> {
+
+    let r = read_resp(reader).await?;
+    let map = RespMap::from_string(r);
+    Ok(C::Resp(map.into()))
+}
+
 
 pub async fn handle_resp(
     cmd: &Command<'_>,

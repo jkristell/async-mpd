@@ -8,7 +8,7 @@ pub(crate) mod resp;
 mod respmap;
 pub use resp::MixedResponse;
 
-mod cmd;
+pub mod cmd;
 pub use cmd::{Command, CommandResponse};
 
 pub(crate) mod io;

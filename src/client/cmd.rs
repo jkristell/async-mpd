@@ -1,5 +1,22 @@
 use crate::{MixedResponse, Track};
 
+
+pub trait MpdCommandG {
+    type Resp;
+    const cmdname: &'static str;
+
+    fn to_cmdline(&self) -> String {
+        format!("{}", Self::cmdname)
+    }
+}
+
+pub struct Stats;
+
+impl MpdCommandG for Stats {
+    type Resp = crate::Stats;
+    const cmdname: &'static str = "stats";
+}
+
 pub enum Command<'a> {
     Stats,
     Status,

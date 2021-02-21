@@ -4,7 +4,8 @@ use futures_lite::io::BufReader;
 use std::{io, net::SocketAddr};
 
 use crate::client::{Command, CommandResponse};
-use crate::{client::resp::MixedResponse, client::Filter, Stats, Status, Subsystem, Track};
+use crate::{client::resp::MixedResponse, client::Filter, Stats, Status, Subsystem, Track, cmd};
+use crate::cmd::MpdCommandG;
 
 /// Error
 #[derive(thiserror::Error, Debug)]
@@ -73,7 +74,10 @@ impl MpdClient {
 
     /// Get stats on the music database
     pub async fn stats(&mut self) -> Result<Stats, Error> {
-        self.cmd_into(&Command::Stats).await
+
+        self.cmdg(cmd::Stats).await
+
+        //self.cmd_into(&Command::Stats).await
     }
 
     pub async fn status(&mut self) -> Result<Status, Error> {
@@ -189,6 +193,15 @@ impl MpdClient {
     /// ```
     pub async fn search(&mut self, filter: &Filter) -> Result<Vec<Track>, Error> {
         self.cmd_into(&Command::Search(filter.to_query())).await
+    }
+
+    pub async fn cmdg<C: MpdCommandG>(&mut self, cmd: C) -> Result<C::Resp, Error> {
+        let cmdline = cmd.to_cmdline();
+        log::debug!("Sending cmdline: {}", cmdline);
+
+        crate::io::send_command(&cmdline, &mut self.bufreader).await?;
+
+        crate::io::handle_resp_g(&cmd, &mut self.bufreader).await
     }
 
     pub async fn cmd(&mut self, cmd: &Command<'_>) -> Result<CommandResponse, Error> {
