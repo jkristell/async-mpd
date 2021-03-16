@@ -1,12 +1,21 @@
 use crate::{MixedResponse, Track};
+use crate::client::respmap::RespMap;
 
 
 pub trait MpdCommandG {
-    type Resp;
-    const cmdname: &'static str;
+    type Resp: From<RespMap>;
+    const CMD: &'static str;
+
+    fn argument(&self) -> Option<String> {
+        None
+    }
 
     fn to_cmdline(&self) -> String {
-        format!("{}", Self::cmdname)
+        if let Some(arg) = self.argument() {
+            format!("{} {}", Self::CMD, arg)
+        } else {
+            Self::CMD.to_string()
+        }
     }
 }
 
@@ -14,8 +23,29 @@ pub struct Stats;
 
 impl MpdCommandG for Stats {
     type Resp = crate::Stats;
-    const cmdname: &'static str = "stats";
+    const CMD: &'static str = "stats";
 }
+
+pub struct Status;
+
+impl MpdCommandG for Status {
+    type Resp = crate::Status;
+    const CMD: &'static str = "status";
+}
+
+pub struct PlayId(pub u32);
+
+impl MpdCommandG for PlayId {
+    type Resp = ();
+    const CMD: &'static str = "playid";
+
+    fn argument(&self) -> Option<String> {
+        Some(self.0.to_string())
+    }
+}
+
+
+
 
 pub enum Command<'a> {
     Stats,

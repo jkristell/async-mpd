@@ -12,6 +12,7 @@ use crate::{
     resp, Error,
 };
 use crate::cmd::MpdCommandG;
+use std::convert::TryFrom;
 
 pub async fn send_command(line: &str, reader: &mut BufReader<TcpStream>) -> std::io::Result<()> {
     // Get the underlying TcpStrem and write command to the socket
@@ -21,11 +22,22 @@ pub async fn send_command(line: &str, reader: &mut BufReader<TcpStream>) -> std:
 pub async fn handle_resp_g<C: MpdCommandG>(
     cmd: &C,
     reader: &mut BufReader<TcpStream>,
-) -> Result<CommandResponse, crate::Error> {
+) -> Result<C::Resp, crate::Error> {
 
     let r = read_resp(reader).await?;
     let map = RespMap::from_string(r);
-    Ok(C::Resp(map.into()))
+    Ok(map.into())
+    //Ok(C::Resp::from(map))
+}
+
+impl TryFrom<&mut BufReader<TcpStream>> for crate::Stats {
+    type Error = Error;
+
+    fn try_from(reader: &mut BufReader<TcpStream>) -> Self {
+        let r = read_resp(reader).await?;
+        let map = RespMap::from_string(r);
+        Ok(map.into())
+    }
 }
 
 
