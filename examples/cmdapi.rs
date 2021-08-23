@@ -1,4 +1,4 @@
-use async_mpd::{cmd, Error, MpdClient, ResponseHandler, EnumResponse};
+use async_mpd::{cmd, EnumResponse, Error, MpdClient, ResponseHandler};
 use structopt::StructOpt;
 
 // To use tokio you would do:
@@ -35,7 +35,6 @@ async fn main() -> Result<(), Error> {
 
     let mut flip = true;
     loop {
-
         let res = if flip {
             dispatcher_resp_enum(&mut mpd, cmd::Status).await?
         } else {
@@ -81,7 +80,6 @@ async fn dispatcher_resp_enum<C: MpdCmd + Copy>(
 
     ret
 }
-
 
 async fn dispatcher<C: MpdCmd + Copy>(
     mpd: &mut MpdClient,

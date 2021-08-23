@@ -1,6 +1,7 @@
 use async_net::{AsyncToSocketAddrs, TcpStream};
 use futures_lite::{io::BufReader, AsyncWriteExt};
 
+use crate::resp::EnumResponse;
 use crate::{
     client::resp::{
         handlers::ResponseHandler,
@@ -10,8 +11,7 @@ use crate::{
     cmd::{self, MpdCmd},
     DatabaseVersion, Error, Filter, Stats, Status, Subsystem, Track,
 };
-use crate::resp::EnumResponse;
-use std::net::{SocketAddr};
+use std::net::SocketAddr;
 
 /// Mpd Client
 pub struct MpdClient {
@@ -24,11 +24,13 @@ pub struct MpdClient {
 impl MpdClient {
     /// Create a new MpdClient
     pub fn new() -> Self {
-        Self { stream: None, addr: None }
+        Self {
+            stream: None,
+            addr: None,
+        }
     }
 
     pub async fn connect<A: AsyncToSocketAddrs>(&mut self, addr: A) -> Result<String, Error> {
-
         let stream = TcpStream::connect(addr).await?;
         // Save the resolved adress for reconnect
         let sock_addr = stream.peer_addr()?;
@@ -197,16 +199,12 @@ impl MpdClient {
 
      */
 
-    pub async fn exec_enumresp<C>(
-        &mut self,
-        cmd: C,
-    ) -> Result<EnumResponse, crate::Error>
-        where
-            C: MpdCmd,
+    pub async fn exec_enumresp<C>(&mut self, cmd: C) -> Result<EnumResponse, crate::Error>
+    where
+        C: MpdCmd,
     {
         self.exec(cmd).await.map(Into::into)
     }
-
 
     pub async fn exec<C>(
         &mut self,
@@ -224,9 +222,6 @@ impl MpdClient {
         // Handle the response associated with this command
         C::Handler::handle(br).await
     }
-
-
-
 
     async fn send_command(&mut self, line: &str) -> Result<(), crate::Error> {
         // Get the underlying TcpStream and write command to the socket

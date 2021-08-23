@@ -7,6 +7,7 @@ use futures_lite::{AsyncBufReadExt, StreamExt};
 use std::marker::PhantomData;
 use std::str::FromStr;
 
+use crate::resp::EnumResponse;
 use crate::{
     client::resp::{
         read_resp_line,
@@ -15,7 +16,6 @@ use crate::{
     },
     Error, Track,
 };
-use crate::resp::EnumResponse;
 
 #[async_trait]
 /// Response Handler for Cmd
@@ -86,7 +86,9 @@ pub struct SingleLineResp<T> {
 }
 
 #[async_trait]
-impl<E: Into<crate::Error>, T: FromStr<Err = E> + Into<EnumResponse>> ResponseHandler for SingleLineResp<T> {
+impl<E: Into<crate::Error>, T: FromStr<Err = E> + Into<EnumResponse>> ResponseHandler
+    for SingleLineResp<T>
+{
     type Response = T;
 
     async fn handle(reader: &mut BufReader<TcpStream>) -> Result<Self::Response, Error> {
