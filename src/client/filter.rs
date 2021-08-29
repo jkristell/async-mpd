@@ -19,7 +19,7 @@ impl ToFilterExpr for Tag {
     }
 }
 
-/// Search expression used by search function
+/// Filter expression used by search function
 pub enum FilterExpr {
     Equals(Tag, String),
     Contains(Tag, String),
@@ -37,6 +37,7 @@ impl FilterExpr {
 }
 
 /// Abstraction over search filter
+#[derive(Default)]
 pub struct Filter {
     exprs: Vec<FilterExpr>,
 }

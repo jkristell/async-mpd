@@ -80,6 +80,9 @@ pub struct Stats {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
+pub struct DatabaseVersion(pub u32);
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 /// Track
 pub struct Track {
     pub file: String,
@@ -158,4 +161,6 @@ pub enum Subsystem {
     Sticker,
     Subscription,
     Message,
+
+    Other,
 }

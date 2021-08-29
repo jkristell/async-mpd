@@ -1,9 +1,8 @@
-use itertools::Itertools;
 use multimap::MultiMap;
 use std::str::FromStr;
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RespMap {
     pub(crate) inner: MultiMap<String, String>,
 }
@@ -27,7 +26,7 @@ impl RespMap {
         let mut map = MultiMap::new();
 
         for line in input.lines() {
-            if let Some((k, v)) = line.split(": ").next_tuple() {
+            if let Some((k, v)) = line.split_once(": ") {
                 log::info!("kv: {} {}", k, v);
                 map.insert(k.into(), v.into());
             }
@@ -40,7 +39,7 @@ impl RespMap {
         let mut map = MultiMap::new();
 
         for line in input {
-            if let Some((k, v)) = line.split(": ").next_tuple() {
+            if let Some((k, v)) = line.split_once(": ") {
                 log::info!("kv: {} {}", k, v);
                 map.insert(k.into(), v.into());
             }
