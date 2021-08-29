@@ -1,45 +1,38 @@
-[![crates.io version](https://meritbadge.herokuapp.com/async-mpd)](https://crates.io/crates/async-mpd)
+[![crates.io version](https://img.shields.io/crates/v/async-mpd)](https://crates.io/crates/async-mpd)
 [![docs.rs](https://docs.rs/async-mpd/badge.svg)](https://docs.rs/async-mpd)
 
 # async-mpd
 
- Runtime agnostic mpd client library
+Runtime agnostic Mpd client library for Rust
 
 ## Example:
 ```rust
-// To use tokio you would do:
-// use tokio as runtime;
-use async_std as runtime;
+use tokio as runtime;
+// For async-std instead
+//use async_std as runtime;
+use async_mpd::{MpdClient, cmd};
 
 #[runtime::main]
 async fn main() -> Result<(), async_mpd::Error> {
     // Connect to server
-    let mut mpd = async_mpd::MpdClient::new("localhost:6600").await?;
+    let mut mpd = MpdClient::new();
+    mpd.connect("localhost:6600").await?;
 
-    // Get all tracks in the play queue
+    // Get all tracks in the play queue and display them
     let queue = mpd.queue().await?;
-
-    // Print the queue
     for track in queue {
-        println!(
-            "{:3}: {} - {}",
-            track.id.unwrap(),
-            track.artist.unwrap_or_default(),
-            track.title.unwrap_or_default(),
-        );
+        println!("{:?} - {:?}", track.artist, track.title);
     }
 
     // Play track nr 2 in the queue
     mpd.playid(2).await?;
 
-    // Get and print the current server status
-    println!("{:?}", mpd.status().await?);
+    // Get and print the current server status using the command api
+    let status = mpd.exec(cmd::Status).await?;
+    println!("{:?}", status);
 
     // Set the volume to 50%
     mpd.setvol(50).await?;
-
-    // Stop playing
-    mpd.stop().await?;
 
     Ok(())
 }
