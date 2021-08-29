@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use smart_default::SmartDefault;
 use std::time::Duration;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -58,13 +57,18 @@ pub struct Status {
     pub error: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, SmartDefault)]
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
 /// Player status
 pub enum State {
     Play,
-    #[default]
     Stop,
     Pause,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State::Stop
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]

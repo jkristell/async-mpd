@@ -23,7 +23,6 @@ chrono = { version = "0.4", features = ["serde"] }
 thiserror = { version = "1.0", optional = true }
 futures-lite = { version = "1.11", optional = true }
 multimap = { version = "0.8", optional = true }
-smart-default = "0.6"
 async-trait = { version = "0.1.48", optional = true }
 
 [dev-dependencies]
