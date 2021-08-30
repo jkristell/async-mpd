@@ -31,7 +31,6 @@ impl MpdClient {
     }
 
     pub async fn connect<A: AsyncToSocketAddrs>(&mut self, addr: A) -> Result<(), Error> {
-
         let stream = TcpStream::connect(addr).await?;
         let server_addr = stream.peer_addr()?;
         let reader = BufReader::new(stream);

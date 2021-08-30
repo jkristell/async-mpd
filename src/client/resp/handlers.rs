@@ -94,7 +94,9 @@ impl<E: Into<crate::Error>, T: FromStr<Err = E> + Into<WrappedResponse>> Respons
     async fn handle(reader: &mut BufReader<TcpStream>) -> Result<Self::Response, Error> {
         let line = read_resp_line(reader).await?;
 
-        let (_key, value) = line.split_once(": ").ok_or(crate::Error::ValueError {msg: "invalid line".to_string() })?;
+        let (_key, value) = line.split_once(": ").ok_or(crate::Error::ValueError {
+            msg: "invalid line".to_string(),
+        })?;
 
         T::from_str(value).map_err(Into::into)
     }
