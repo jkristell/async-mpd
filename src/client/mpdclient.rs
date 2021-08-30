@@ -18,39 +18,42 @@ use crate::{
 pub struct MpdClient {
     /// Buffered Stream
     stream: Option<BufReader<TcpStream>>,
-    // Addr
+    /// Address (for reconnects)
     addr: Option<SocketAddr>,
+    /// MPD server version
+    version: Option<String>,
 }
 
 impl MpdClient {
     /// Create a new MpdClient
     pub fn new() -> Self {
-        Self {
-            stream: None,
-            addr: None,
-        }
+        Self::default()
     }
 
-    pub async fn connect<A: AsyncToSocketAddrs>(&mut self, addr: A) -> Result<String, Error> {
+    pub async fn connect<A: AsyncToSocketAddrs>(&mut self, addr: A) -> Result<(), Error> {
+
         let stream = TcpStream::connect(addr).await?;
-        // Save the resolved adress for reconnect
-        let sock_addr = stream.peer_addr()?;
-
+        let server_addr = stream.peer_addr()?;
         let reader = BufReader::new(stream);
+        let version = self.read_version().await?;
 
-        log::debug!("server: {:?}", sock_addr);
+        log::debug!(
+            "Connected to server at: {:?}, version: {}",
+            server_addr,
+            version
+        );
 
         self.stream = Some(reader);
-        self.addr = Some(sock_addr);
+        self.addr = Some(server_addr);
+        self.version = Some(version);
 
-        // After connect, the server replies with a a version reply
-        Ok(self.read_version().await?)
+        Ok(())
     }
 
     pub async fn reconnect(&mut self) -> Result<(), Error> {
         if let Some(addr) = self.addr {
             log::debug!("Reconnection to: {:?}", addr);
-            self.connect(addr).await.map(|_| ())
+            self.connect(addr).await
         } else {
             log::warn!("Reconnect without previous connection");
             Err(Error::Disconnected)
@@ -59,10 +62,14 @@ impl MpdClient {
 
     async fn read_version(&mut self) -> Result<String, Error> {
         let br = self.stream.as_mut().ok_or(Error::Disconnected)?;
-
         let version = read_resp_line(br).await?;
         log::debug!("Connected: {}", version);
         Ok(version)
+    }
+
+    /// Server version
+    pub fn version(&self) -> Option<&str> {
+        self.version.as_deref()
     }
 
     /// Get stats on the music database
