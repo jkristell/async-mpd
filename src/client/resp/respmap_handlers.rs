@@ -5,7 +5,7 @@ use futures_lite::{io::AsyncBufReadExt, io::BufReader, StreamExt};
 use serde::Serialize;
 
 use crate::client::resp::respmap::RespMap;
-use crate::{DatabaseVersion, Directory, Playlist, State, Stats, Status, Subsystem, Track};
+use crate::{DatabaseVersion, Id, Directory, Playlist, State, Stats, Status, Subsystem, Track};
 use std::convert::TryFrom;
 
 impl From<RespMap> for Subsystem {
@@ -48,6 +48,13 @@ impl From<RespMap> for DatabaseVersion {
     fn from(mut map: RespMap) -> Self {
         let v = map.get_def("updating_db");
         DatabaseVersion(v)
+    }
+}
+
+impl From<RespMap> for Id {
+    fn from(mut map: RespMap) -> Self {
+        let v = map.get_def("Id");
+        Id(v)
     }
 }
 

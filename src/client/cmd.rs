@@ -5,7 +5,7 @@ use crate::{
         handlers::{MixedResponseResponse, OkResponse, RespMapResponse, ResponseHandler, Tracks},
         respmap_handlers::ListallResponse,
     },
-    DatabaseVersion,
+    DatabaseVersion, Id,
 };
 
 #[derive(Copy, Clone)]
@@ -90,7 +90,7 @@ impl<'a> MpdCmd for ListallInfo<'a> {
 
 impl<'a> MpdCmd for QueueInsert<'a> {
     const CMD: &'static str = "addid";
-    type Handler = OkResponse;
+    type Handler = RespMapResponse<Id>;
 
     fn to_cmdline(&self) -> String {
         format!("{} \"{}\" \"{}\"\n", Self::CMD, self.0, self.1)

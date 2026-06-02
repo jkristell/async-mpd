@@ -1,6 +1,6 @@
 use crate::client::resp::respmap_handlers::{ListallResponse, ListallinfoResponse};
 use crate::protocol::Stats;
-use crate::{protocol, DatabaseVersion, Error, Status, Subsystem, Track};
+use crate::{protocol, DatabaseVersion, Id, Error, Status, Subsystem, Track};
 use async_net::TcpStream;
 use futures_lite::io::BufReader;
 use futures_lite::AsyncBufReadExt;
@@ -24,6 +24,7 @@ pub enum WrappedResponse {
     Listall(ListallResponse),
     Subsystem(Subsystem),
     DatabaseVersion(DatabaseVersion),
+    Id(Id),
     Status(Status),
     Stats(Stats),
 }
@@ -61,6 +62,12 @@ impl From<protocol::Subsystem> for WrappedResponse {
 impl From<protocol::DatabaseVersion> for WrappedResponse {
     fn from(d: DatabaseVersion) -> Self {
         WrappedResponse::DatabaseVersion(d)
+    }
+}
+
+impl From<protocol::Id> for WrappedResponse {
+    fn from(d: Id) -> Self {
+        WrappedResponse::Id(d)
     }
 }
 

@@ -10,7 +10,7 @@ use crate::{
         respmap_handlers::{ListallResponse, ListallinfoResponse},
     },
     cmd::{self, MpdCmd},
-    DatabaseVersion, Error, Filter, Stats, Status, Subsystem, Track,
+    DatabaseVersion, Id, Error, Filter, Stats, Status, Subsystem, Track,
 };
 
 /// Mpd Client
@@ -155,7 +155,7 @@ impl MpdClient {
         self.exec(cmd::QueueAdd(path)).await
     }
 
-    pub async fn queue_insert(&mut self, path: &str, position: u32) -> Result<(), Error> {
+    pub async fn queue_insert(&mut self, path: &str, position: u32) -> Result<Id, Error> {
         self.exec(cmd::QueueInsert(path, position)).await
     }
 
