@@ -5,7 +5,7 @@ use crate::{
         handlers::{MixedResponseResponse, OkResponse, RespMapResponse, ResponseHandler, Tracks},
         respmap_handlers::ListallResponse,
     },
-    DatabaseVersion,
+    DatabaseVersion, Id,
 };
 
 #[derive(Copy, Clone)]
@@ -28,6 +28,8 @@ pub struct PlayId(pub u32);
 pub struct QueueClear;
 #[derive(Copy, Clone)]
 pub struct QueueAdd<'a>(pub &'a str);
+#[derive(Copy, Clone)]
+pub struct QueueInsert<'a>(pub &'a str, pub u32);
 
 #[derive(Copy, Clone)]
 pub struct Search<'a>(pub Option<&'a str>);
@@ -83,6 +85,15 @@ impl<'a> MpdCmd for ListallInfo<'a> {
 
     fn argument(&self) -> Option<String> {
         self.0.map(ToString::to_string)
+    }
+}
+
+impl<'a> MpdCmd for QueueInsert<'a> {
+    const CMD: &'static str = "addid";
+    type Handler = RespMapResponse<Id>;
+
+    fn to_cmdline(&self) -> String {
+        format!("{} \"{}\" \"{}\"\n", Self::CMD, self.0, self.1)
     }
 }
 
