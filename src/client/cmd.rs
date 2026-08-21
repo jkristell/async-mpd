@@ -183,7 +183,7 @@ impl MpdCmd for Next {
     type Handler = OkResponse;
 }
 impl MpdCmd for Prev {
-    const CMD: &'static str = "prev";
+    const CMD: &'static str = "previous";
     type Handler = OkResponse;
 }
 
